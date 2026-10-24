@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="admin-head">
+  <div><span class="eyebrow">PAINEL</span><h1>Administração da pesquisa</h1></div>
+  <a class="link-button" href="{{ url_for('admin_logout') }}">Sair</a>
+</div>
+<div class="admin-grid">
+  <section class="panel">
+    <h2>Pesquisa</h2>
+    <form method="post">
+      <input type="hidden" name="action" value="poll_title">
+      <label>Título</label>
+      <input name="title" value="{{ poll.title }}" maxlength="180" required>
+      <button>Salvar título</button>
+    </form>
+    <div class="stat"><strong>{{ total }}</strong><span>votos atuais</span></div>
+    <form method="post" onsubmit="return confirm('Zerar todos os votos da pesquisa atual?')">
+      <input type="hidden" name="action" value="reset_votes">
+      <button class="danger-btn">Zerar votos</button>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h2>Adicionar candidato/opção</h2>
+    <form method="post">
+      <input type="hidden" name="action" value="add_candidate">
+      <label>Nome</label><input name="name" required maxlength="120">
+      <label>Número (opcional)</label><input name="number" maxlength="10">
+      <label>URL da foto (opcional)</label><input name="photo_url" maxlength="500" placeholder="https://...">
+      <button>Adicionar</button>
+    </form>
+  </section>
+</div>
+<section class="panel">
+  <h2>Candidatos/opções cadastrados</h2>
+  <div class="admin-list">
+    {% for c in candidates %}
+    <div class="admin-item"><span><strong>{{ c.number or '—' }}</strong> {{ c.name }}</span>
+      <form method="post" action="{{ url_for('delete_candidate', candidate_id=c.id) }}" onsubmit="return confirm('Excluir esta opção e seus votos?')"><button class="danger-btn small">Excluir</button></form>
+    </div>
+    {% else %}<p>Nenhum cadastrado.</p>{% endfor %}
+  </div>
+</section>
+{% endblock %}
