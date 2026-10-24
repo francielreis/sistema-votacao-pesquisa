@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="hero">
+  <span class="eyebrow">PESQUISA SIMULADA</span>
+  <h1>{{ poll.title }}</h1>
+  <p>Selecione uma opção. O sistema permite um voto por dispositivo/navegador na pesquisa atual.</p>
+</section>
+
+{% if already_voted %}
+<div class="alert warning">Você já participou desta pesquisa neste dispositivo. <a href="{{ url_for('results') }}">Ver resultados</a>.</div>
+{% endif %}
+
+<div class="cards">
+  {% for c in candidates %}
+  <article class="candidate-card">
+    {% if c.photo_url %}<img src="{{ c.photo_url }}" alt="Foto de {{ c.name }}">{% else %}<div class="avatar">{{ c.name[:1]|upper }}</div>{% endif %}
+    <div class="candidate-info">
+      {% if c.number %}<span class="number">{{ c.number }}</span>{% endif %}
+      <h2>{{ c.name }}</h2>
+      <form method="post" action="{{ url_for('vote', candidate_id=c.id) }}">
+        <button type="submit" {% if already_voted %}disabled{% endif %}>Registrar voto</button>
+      </form>
+    </div>
+  </article>
+  {% else %}
+  <div class="empty">Nenhuma opção cadastrada ainda. Entre no painel administrativo para começar.</div>
+  {% endfor %}
+</div>
+{% endblock %}
