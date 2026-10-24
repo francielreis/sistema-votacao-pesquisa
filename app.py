@@ -9,9 +9,14 @@ from flask_sqlalchemy import SQLAlchemy
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-change-me')
 
-database_url = os.getenv('DATABASE_URL', 'sqlite:///votacao.db')
+database_url = os.getenv('DATABASE_URL', '').strip().strip('"').strip("'")
 if database_url.startswith('postgres://'):
     database_url = database_url.replace('postgres://', 'postgresql://', 1)
+
+valid_db_prefixes = ('postgresql://', 'postgresql+psycopg2://', 'sqlite:///', 'sqlite://')
+if not database_url or not database_url.startswith(valid_db_prefixes):
+    database_url = 'sqlite:///votacao.db'
+
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -56,8 +61,13 @@ def current_poll():
 
 
 def voter_fingerprint():
-    # Privacidade: usa apenas um hash técnico para reduzir voto repetido; não armazena IP puro.
-    raw = f"{request.remote_addr}|{request.headers.get('User-Agent','')}|{app.config['SECRET_KEY']}"
+    # Identificador anônimo por navegador/sessão. Evita bloquear pessoas diferentes
+    # que estejam na mesma rede/IP durante uma pesquisa simulada.
+    token = session.get('voter_token')
+    if not token:
+        token = os.urandom(32).hex()
+        session['voter_token'] = token
+    raw = f"{token}|{app.config['SECRET_KEY']}"
     return hashlib.sha256(raw.encode('utf-8')).hexdigest()
 
 
@@ -85,7 +95,7 @@ def vote(candidate_id):
     fp = voter_fingerprint()
 
     if Vote.query.filter_by(poll_id=poll.id, voter_hash=fp).first():
-        flash('Este dispositivo já registrou um voto nesta pesquisa.', 'warning')
+        flash('Este navegador já registrou um voto nesta pesquisa.', 'warning')
         return redirect(url_for('results'))
 
     db.session.add(Vote(poll_id=poll.id, candidate_id=candidate.id, voter_hash=fp))
@@ -178,4 +188,4 @@ with app.app_context():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)), debug=True)
+    app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)), debug=os.getenv('FLASK_DEBUG') == '1')
