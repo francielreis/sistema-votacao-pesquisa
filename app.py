@@ -12,6 +12,8 @@ app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-change-me')
 database_url = os.getenv('DATABASE_URL', '').strip().strip('"').strip("'")
 if database_url.startswith('postgres://'):
     database_url = database_url.replace('postgres://', 'postgresql://', 1)
+if database_url.startswith('postgresql+psycopg://'):
+    database_url = database_url.replace('postgresql+psycopg://', 'postgresql+psycopg2://', 1)
 
 valid_db_prefixes = ('postgresql://', 'postgresql+psycopg2://', 'sqlite:///', 'sqlite://')
 if not database_url or not database_url.startswith(valid_db_prefixes):
