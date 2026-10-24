@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="hero compact">
+  <span class="eyebrow">APURAÇÃO</span>
+  <h1>{{ poll.title }}</h1>
+  <p><strong>{{ total }}</strong> voto(s) simulado(s) registrado(s).</p>
+</section>
+<div class="results-card">
+  {% for row in rows %}
+  <div class="result-row">
+    <div class="result-head"><span>{{ row.candidate.number or '—' }} · {{ row.candidate.name }}</span><strong>{{ '%.1f'|format(row.pct) }}%</strong></div>
+    <div class="bar"><div class="bar-fill" style="width: {{ row.pct }}%"></div></div>
+    <small>{{ row.votes }} voto(s)</small>
+  </div>
+  {% else %}
+  <p>Nenhuma opção cadastrada.</p>
+  {% endfor %}
+</div>
+{% endblock %}
