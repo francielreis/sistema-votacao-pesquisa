@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: sistema-votacao-pesquisa
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ADMIN_PASSWORD
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: votacao-pesquisa-db
+          property: connectionString
+
+databases:
+  - name: votacao-pesquisa-db
+    plan: free
