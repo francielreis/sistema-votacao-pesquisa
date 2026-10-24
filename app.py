@@ -180,7 +180,10 @@ def delete_candidate(candidate_id):
 
 @app.get('/health')
 def health():
-    return {'status': 'ok'}
+    return {
+        'status': 'ok',
+        'database': db.engine.url.get_backend_name()
+    }
 
 
 with app.app_context():
