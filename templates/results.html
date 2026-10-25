@@ -5,15 +5,39 @@
   <h1>{{ poll.title }}</h1>
   <p><strong>{{ total }}</strong> voto(s) simulado(s) registrado(s).</p>
 </section>
+
 <div class="results-card">
   {% for row in rows %}
   <div class="result-row">
-    <div class="result-head"><span>{{ row.candidate.number or '—' }} · {{ row.candidate.name }}</span><strong>{{ '%.1f'|format(row.pct) }}%</strong></div>
+    <div class="result-head">
+      <span>{{ row.candidate.number }} · {{ row.candidate.name }}</span>
+      <strong>{{ '%.1f'|format(row.pct) }}%</strong>
+    </div>
     <div class="bar"><div class="bar-fill" style="width: {{ row.pct }}%"></div></div>
     <small>{{ row.votes }} voto(s)</small>
   </div>
-  {% else %}
-  <p>Nenhuma opção cadastrada.</p>
   {% endfor %}
+
+  <div class="result-row">
+    <div class="result-head">
+      <span>BRANCO</span>
+      <strong>{{ '%.1f'|format(blank_pct) }}%</strong>
+    </div>
+    <div class="bar"><div class="bar-fill" style="width: {{ blank_pct }}%"></div></div>
+    <small>{{ blank_votes }} voto(s)</small>
+  </div>
+
+  <div class="result-row">
+    <div class="result-head">
+      <span>NULO</span>
+      <strong>{{ '%.1f'|format(null_pct) }}%</strong>
+    </div>
+    <div class="bar"><div class="bar-fill" style="width: {{ null_pct }}%"></div></div>
+    <small>{{ null_votes }} voto(s)</small>
+  </div>
+
+  {% if total == 0 %}
+  <p>Nenhum voto registrado ainda.</p>
+  {% endif %}
 </div>
 {% endblock %}
