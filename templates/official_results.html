@@ -700,6 +700,7 @@
   let robotCurrentSignature = '';
   let robotQueuedData = null;
   let robotSpeechRunId = 0;
+  let robotAutoRetryTimers = [];
 
   const els = {
     status: document.getElementById('status'),
@@ -1111,6 +1112,7 @@
       utterance.onstart = function() {
         startedAny = true;
         robotVoiceUnlocked = true;
+        clearRobotAutoRetries();
         setRobotSpeaking(true);
         if (els.robotVoiceStatus) {
           els.robotVoiceStatus.textContent = 'Voz automática ligada — acompanhando a apuração';
@@ -1149,10 +1151,15 @@
       if (runId !== robotSpeechRunId) return;
       if (!startedAny && !window.speechSynthesis.speaking) {
         robotCurrentSignature = '';
+        // Se a tentativa automática ficou apenas pendente, limpa a fila para
+        // permitir uma nova tentativa alguns segundos depois.
+        try {
+          if (window.speechSynthesis.pending) window.speechSynthesis.cancel();
+        } catch (error) {}
         if (els.robotVoiceStatus) {
           els.robotVoiceStatus.textContent =
-            'Se o navegador bloquear o áudio, toque uma vez em qualquer lugar da página.';
-          els.robotVoiceStatus.classList.remove('active');
+            'Tentando iniciar a voz automaticamente…';
+          els.robotVoiceStatus.classList.add('active');
         }
       }
     }, 1400);
@@ -1180,7 +1187,7 @@
     }
     if (els.robotVoiceStatus) {
       els.robotVoiceStatus.textContent = robotVoiceEnabled
-        ? 'Voz automática ligada — o robô tenta falar ao abrir e, se o navegador bloquear, fala no primeiro toque na página'
+        ? 'Voz automática ligada — tentando falar sozinho ao abrir a página'
         : 'Voz automática desligada';
       els.robotVoiceStatus.classList.toggle('active', robotVoiceEnabled);
     }
@@ -1289,12 +1296,47 @@
     updateRobotBubble(latestOfficialData);
   }
 
-  // Tenta a saudação imediatamente. Em navegadores móveis, o áudio pode ser
-  // bloqueado até a primeira interação; nesse caso, o primeiro toque na tela
-  // chama unlockRobotVoiceFromAnyInteraction() e reproduz a saudação.
+  function clearRobotAutoRetries() {
+    robotAutoRetryTimers.forEach(function(timer) {
+      window.clearTimeout(timer);
+    });
+    robotAutoRetryTimers = [];
+  }
+
+  function tryRobotAutoVoice() {
+    if (!robotVoiceEnabled || robotVoiceUnlocked || document.hidden) return;
+    if (!('speechSynthesis' in window)) return;
+
+    try { window.speechSynthesis.resume(); } catch (error) {}
+
+    // Se uma tentativa anterior ficou travada na fila sem começar, libera
+    // para uma nova tentativa automática.
+    if (!window.speechSynthesis.speaking && !robotCurrentSignature) {
+      speakRobot(latestOfficialData || null, true);
+    }
+  }
+
+  function scheduleRobotAutoVoice() {
+    clearRobotAutoRetries();
+    [150, 1800, 4200, 8000].forEach(function(delay) {
+      robotAutoRetryTimers.push(window.setTimeout(tryRobotAutoVoice, delay));
+    });
+  }
+
+  // Tenta falar sozinho assim que a página abre e repete quando o Android
+  // disponibiliza as vozes do sistema. Nenhum toque é exigido pelo código.
   if (robotVoiceEnabled) {
     robotAutoAttempted = true;
-    speakRobot(null, true);
+    scheduleRobotAutoVoice();
+
+    window.addEventListener('load', scheduleRobotAutoVoice, { once: true });
+    window.addEventListener('pageshow', scheduleRobotAutoVoice);
+
+    if ('speechSynthesis' in window && window.speechSynthesis.addEventListener) {
+      window.speechSynthesis.addEventListener('voiceschanged', function() {
+        if (!robotVoiceUnlocked) scheduleRobotAutoVoice();
+      });
+    }
   }
 
   async function loadRegionResults() {
