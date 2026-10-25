@@ -47,11 +47,11 @@ TSE_RESULT_URL = os.getenv(
 TSE_CACHE_SECONDS = max(5, int(os.getenv('TSE_CACHE_SECONDS', '10')))
 TSE_TIMEOUT_SECONDS = max(3, int(os.getenv('TSE_TIMEOUT_SECONDS', '8')))
 
-# Retratos oficiais usados no painel quando nenhuma foto personalizada foi cadastrada.
-# Lula: acervo oficial do Governo Federal. Flávio Bolsonaro: retrato oficial do Senado.
+# Fotos oficiais exibidas pelo TSE no painel de resultados das Eleições 2026.
+# Mantemos exatamente os retratos usados na página oficial de resultados.
 OFFICIAL_CANDIDATE_PHOTOS = {
-    '13': 'https://www.gov.br/secretariageral/pt-br/centrais-de-conteudo/biblioteca-da-pr/galeria-dos-ex-presidentes/luiz-inacio-lula-da-silva/foto-oficial.jfif/@@images/image',
-    '22': 'https://legis.senado.leg.br/senadores/fotos-oficiais/5894',
+    '13': 'https://www.tse.jus.br/imagens/imagens/lula/%40%40images/image-200-93d51d895f8ebc8900bf3e02c7052bef.png',
+    '22': 'https://www.tse.jus.br/imagens/imagens/flavio-bolsonaro/%40%40images/image-200-7092d276831e3453f70c59d07d5c9ae7.png',
 }
 
 _tse_cache = {
