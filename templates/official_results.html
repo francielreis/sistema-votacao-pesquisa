@@ -12,15 +12,98 @@
   .metric { border: 1px solid rgba(127,127,127,.25); border-radius: 16px; padding: 16px; background: rgba(255,255,255,.04); }
   .metric-label { font-size: .82rem; opacity: .72; margin-bottom: 6px; }
   .metric-value { font-size: 1.45rem; font-weight: 900; line-height: 1.1; }
-  .candidate-card { border: 1px solid rgba(127,127,127,.28); border-radius: 18px; padding: 18px; margin-bottom: 15px; background: rgba(255,255,255,.035); }
-  .candidate-top { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
-  .candidate-name { font-size: 1.2rem; font-weight: 900; }
-  .candidate-party { opacity: .72; font-size: .92rem; margin-top: 3px; }
-  .candidate-score { text-align: right; white-space: nowrap; }
-  .candidate-pct { font-size: 1.7rem; font-weight: 950; }
-  .candidate-votes { font-size: .9rem; opacity: .78; margin-top: 2px; }
-  .bar-track { height: 22px; border-radius: 999px; overflow: hidden; background: rgba(127,127,127,.18); margin-top: 14px; }
-  .bar-fill { height: 100%; min-width: 0; border-radius: inherit; background: linear-gradient(90deg,#1976d2,#42a5f5); transition: width .7s ease; }
+  .candidate-card {
+    border: 0;
+    border-radius: 28px;
+    padding: 26px 24px;
+    margin-bottom: 20px;
+    background: #ffffff;
+    color: #182033;
+    box-shadow: 0 14px 34px rgba(0,0,0,.18);
+  }
+  .candidate-top {
+    display: grid;
+    grid-template-columns: 128px minmax(0,1fr) auto;
+    gap: 22px;
+    align-items: center;
+  }
+  .candidate-avatar-ring {
+    --pct: 0;
+    width: 116px;
+    height: 116px;
+    border-radius: 50%;
+    padding: 7px;
+    background: conic-gradient(#f0bc00 calc(var(--pct) * 1%), #eceff3 0);
+    display: grid;
+    place-items: center;
+  }
+  .candidate-avatar {
+    width: 102px;
+    height: 102px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: #eef1f5;
+    border: 5px solid #fff;
+    display: block;
+  }
+  .candidate-avatar-fallback {
+    width: 102px;
+    height: 102px;
+    border-radius: 50%;
+    background: #eef1f5;
+    border: 5px solid #fff;
+    display: grid;
+    place-items: center;
+    font-size: 2rem;
+    font-weight: 950;
+    color: #4a5568;
+  }
+  .candidate-info { min-width: 0; }
+  .candidate-party {
+    color: #5d6677;
+    font-size: 1rem;
+    font-weight: 800;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+  }
+  .candidate-name {
+    font-size: 1.55rem;
+    line-height: 1.08;
+    font-weight: 950;
+    letter-spacing: -.02em;
+    word-break: break-word;
+  }
+  .candidate-score {
+    text-align: right;
+    white-space: nowrap;
+    align-self: center;
+  }
+  .candidate-pct {
+    color: #efb900;
+    font-size: 2.55rem;
+    line-height: 1;
+    font-weight: 950;
+    letter-spacing: -.03em;
+  }
+  .candidate-votes {
+    color: #5d6677;
+    font-size: 1.1rem;
+    margin-top: 9px;
+  }
+  .bar-track {
+    height: 8px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: #eef1f5;
+    margin-top: 20px;
+  }
+  .bar-fill {
+    height: 100%;
+    min-width: 0;
+    border-radius: inherit;
+    background: #efb900;
+    transition: width .7s ease;
+  }
   .chart-title { margin: 6px 0 14px; font-size: 1.05rem; font-weight: 900; }
   .updated { text-align: center; margin-top: 18px; opacity: .7; font-size: .9rem; }
   .official-disclaimer { margin-top: 20px; padding: 14px; border-left: 4px solid #1976d2; background: rgba(25,118,210,.08); border-radius: 10px; }
@@ -50,8 +133,15 @@
   .legend-dot { width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:5px; }
   @media (max-width: 760px) {
     .summary-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
-    .candidate-top { align-items: center; }
-    .candidate-pct { font-size: 1.45rem; }
+    .candidate-top { grid-template-columns: 92px minmax(0,1fr); gap: 14px; align-items: center; }
+    .candidate-avatar-ring { width: 86px; height: 86px; padding: 5px; }
+    .candidate-avatar, .candidate-avatar-fallback { width: 76px; height: 76px; border-width: 4px; }
+    .candidate-avatar-fallback { font-size: 1.45rem; }
+    .candidate-score { grid-column: 2; text-align: left; margin-top: 2px; }
+    .candidate-pct { font-size: 2rem; }
+    .candidate-votes { font-size: .98rem; margin-top: 5px; }
+    .candidate-name { font-size: 1.32rem; }
+    .candidate-party { font-size: .9rem; margin-bottom: 7px; }
     .region-map-layout { grid-template-columns: 1fr; }
     .region-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
     #brazilMap { min-height: 390px; }
@@ -188,17 +278,46 @@
       const top = document.createElement('div');
       top.className = 'candidate-top';
 
-      const left = document.createElement('div');
+      const ring = document.createElement('div');
+      ring.className = 'candidate-avatar-ring';
+      ring.style.setProperty('--pct', Math.max(0, Math.min(100, Number(candidate.pct || 0))));
+
+      if (candidate.photo_url) {
+        const img = document.createElement('img');
+        img.className = 'candidate-avatar';
+        img.alt = 'Foto do candidato ' + (candidate.name || '');
+        img.loading = 'lazy';
+        img.referrerPolicy = 'no-referrer';
+        img.src = candidate.photo_url;
+        img.onerror = () => {
+          const fallback = document.createElement('div');
+          fallback.className = 'candidate-avatar-fallback';
+          fallback.textContent = (candidate.name || '?')
+            .split(/\s+/).filter(Boolean).slice(0,2).map(p => p[0]).join('').toUpperCase();
+          img.replaceWith(fallback);
+        };
+        ring.append(img);
+      } else {
+        const fallback = document.createElement('div');
+        fallback.className = 'candidate-avatar-fallback';
+        fallback.textContent = (candidate.name || '?')
+          .split(/\s+/).filter(Boolean).slice(0,2).map(p => p[0]).join('').toUpperCase();
+        ring.append(fallback);
+      }
+
+      const info = document.createElement('div');
+      info.className = 'candidate-info';
+
+      const party = document.createElement('div');
+      party.className = 'candidate-party';
+      party.textContent = [candidate.party, candidate.number ? '– ' + candidate.number : '']
+        .filter(Boolean).join(' ');
+
       const name = document.createElement('div');
       name.className = 'candidate-name';
       name.textContent = candidate.name || 'Candidato';
 
-      const party = document.createElement('div');
-      party.className = 'candidate-party';
-      party.textContent = [candidate.party, candidate.number ? 'nº ' + candidate.number : '']
-        .filter(Boolean).join(' • ');
-
-      left.append(name, party);
+      info.append(party, name);
 
       const score = document.createElement('div');
       score.className = 'candidate-score';
@@ -212,21 +331,19 @@
       votes.textContent = fmtInt(candidate.votes || 0) + ' votos';
 
       score.append(pct, votes);
-      top.append(left, score);
+      top.append(ring, info, score);
 
       const track = document.createElement('div');
       track.className = 'bar-track';
-
       const fill = document.createElement('div');
       fill.className = 'bar-fill';
       fill.style.width = Math.max(0, Math.min(100, Number(candidate.pct || 0))) + '%';
-
       track.append(fill);
+
       card.append(top, track);
       els.candidates.append(card);
     });
   }
-
 
   function regionByName(name) {
     return (regionData?.regions || []).find(r => r.name === name);
