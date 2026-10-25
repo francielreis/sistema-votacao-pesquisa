@@ -47,6 +47,13 @@ TSE_RESULT_URL = os.getenv(
 TSE_CACHE_SECONDS = max(5, int(os.getenv('TSE_CACHE_SECONDS', '10')))
 TSE_TIMEOUT_SECONDS = max(3, int(os.getenv('TSE_TIMEOUT_SECONDS', '8')))
 
+# Fotos oficiais publicadas pelo TSE para os candidatos do 2º turno.
+# Servem como fallback quando nenhuma foto personalizada foi cadastrada no admin.
+OFFICIAL_CANDIDATE_PHOTOS = {
+    '13': 'https://www.tse.jus.br/imagens/imagens/lula/%40%40images/image-200-93d51d895f8ebc8900bf3e02c7052bef.png',
+    '22': 'https://www.tse.jus.br/imagens/imagens/flavio-bolsonaro/%40%40images/image-200-7092d276831e3453f70c59d07d5c9ae7.png',
+}
+
 _tse_cache = {
     'data': None,
     'fetched_at': 0.0,
@@ -526,7 +533,11 @@ def _attach_candidate_photos(data):
 
     def apply(candidates):
         for candidate in candidates or []:
-            candidate['photo_url'] = photo_map.get(str(candidate.get('number') or '')) or ''
+            number = str(candidate.get('number') or '')
+            custom_photo = photo_map.get(number)
+            official_photo = OFFICIAL_CANDIDATE_PHOTOS.get(number, '')
+            candidate['photo_url'] = custom_photo or official_photo
+            candidate['photo_source'] = 'cadastro' if custom_photo else ('TSE' if official_photo else '')
 
     apply(data.get('candidates'))
     for region in data.get('regions', []) or []:
