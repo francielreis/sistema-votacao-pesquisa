@@ -100,15 +100,26 @@ def get_special_candidate(kind):
 
 def register_vote(candidate, success_message='Voto simulado registrado com sucesso.'):
     poll = current_poll()
-    fp = voter_fingerprint()
+    admin_test_mode = bool(session.get('admin_ok'))
 
-    if Vote.query.filter_by(poll_id=poll.id, voter_hash=fp).first():
-        flash('Este navegador já registrou um voto nesta pesquisa.', 'warning')
-        return redirect(url_for('results'))
+    if admin_test_mode:
+        # No modo de teste do administrador, cada confirmação recebe um identificador
+        # único para permitir vários votos sem liberar essa possibilidade ao público.
+        raw = f"admin-test|{os.urandom(32).hex()}|{app.config['SECRET_KEY']}"
+        fp = hashlib.sha256(raw.encode('utf-8')).hexdigest()
+    else:
+        fp = voter_fingerprint()
+        if Vote.query.filter_by(poll_id=poll.id, voter_hash=fp).first():
+            flash('Este navegador já registrou um voto nesta pesquisa.', 'warning')
+            return redirect(url_for('results'))
 
     db.session.add(Vote(poll_id=poll.id, candidate_id=candidate.id, voter_hash=fp))
     db.session.commit()
-    flash(success_message, 'success')
+
+    if admin_test_mode:
+        flash(f'{success_message} Modo teste do administrador: novo voto permitido.', 'success')
+    else:
+        flash(success_message, 'success')
     return redirect(url_for('results'))
 
 
@@ -118,8 +129,17 @@ def index():
     candidates = Candidate.query.filter(Candidate.number.in_(VALID_NUMBERS)).order_by(
         Candidate.number.asc(), Candidate.name.asc()
     ).all()
-    already_voted = Vote.query.filter_by(poll_id=poll.id, voter_hash=voter_fingerprint()).first() is not None
-    return render_template('index.html', poll=poll, candidates=candidates, already_voted=already_voted)
+    admin_test_mode = bool(session.get('admin_ok'))
+    already_voted = False if admin_test_mode else (
+        Vote.query.filter_by(poll_id=poll.id, voter_hash=voter_fingerprint()).first() is not None
+    )
+    return render_template(
+        'index.html',
+        poll=poll,
+        candidates=candidates,
+        already_voted=already_voted,
+        admin_test_mode=admin_test_mode,
+    )
 
 
 @app.post('/votar/<int:candidate_id>')
