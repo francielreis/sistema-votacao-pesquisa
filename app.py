@@ -24,6 +24,12 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
+VALID_NUMBERS = {'13', '22'}
+SPECIAL_CANDIDATES = {
+    'branco': {'number': '__BRANCO__', 'name': 'Voto em Branco'},
+    'nulo': {'number': '__NULO__', 'name': 'Voto Nulo'},
+}
+
 
 class Poll(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -82,18 +88,18 @@ def admin_required(fn):
     return wrapper
 
 
-@app.route('/')
-def index():
-    poll = current_poll()
-    candidates = Candidate.query.order_by(Candidate.number.asc(), Candidate.name.asc()).all()
-    already_voted = Vote.query.filter_by(poll_id=poll.id, voter_hash=voter_fingerprint()).first() is not None
-    return render_template('index.html', poll=poll, candidates=candidates, already_voted=already_voted)
+def get_special_candidate(kind):
+    data = SPECIAL_CANDIDATES[kind]
+    candidate = Candidate.query.filter_by(number=data['number']).first()
+    if not candidate:
+        candidate = Candidate(name=data['name'], number=data['number'])
+        db.session.add(candidate)
+        db.session.commit()
+    return candidate
 
 
-@app.post('/votar/<int:candidate_id>')
-def vote(candidate_id):
+def register_vote(candidate, success_message='Voto simulado registrado com sucesso.'):
     poll = current_poll()
-    candidate = Candidate.query.get_or_404(candidate_id)
     fp = voter_fingerprint()
 
     if Vote.query.filter_by(poll_id=poll.id, voter_hash=fp).first():
@@ -102,22 +108,72 @@ def vote(candidate_id):
 
     db.session.add(Vote(poll_id=poll.id, candidate_id=candidate.id, voter_hash=fp))
     db.session.commit()
-    flash('Voto simulado registrado com sucesso.', 'success')
+    flash(success_message, 'success')
     return redirect(url_for('results'))
+
+
+@app.route('/')
+def index():
+    poll = current_poll()
+    candidates = Candidate.query.filter(Candidate.number.in_(VALID_NUMBERS)).order_by(
+        Candidate.number.asc(), Candidate.name.asc()
+    ).all()
+    already_voted = Vote.query.filter_by(poll_id=poll.id, voter_hash=voter_fingerprint()).first() is not None
+    return render_template('index.html', poll=poll, candidates=candidates, already_voted=already_voted)
+
+
+@app.post('/votar/<int:candidate_id>')
+def vote(candidate_id):
+    candidate = Candidate.query.get_or_404(candidate_id)
+    if candidate.number not in VALID_NUMBERS:
+        flash('Número inválido. Use 13, 22, BRANCO ou confirme um número diferente como NULO.', 'warning')
+        return redirect(url_for('index'))
+    return register_vote(candidate)
+
+
+@app.post('/votar-especial/<kind>')
+def vote_special(kind):
+    if kind not in SPECIAL_CANDIDATES:
+        return redirect(url_for('index'))
+
+    candidate = get_special_candidate(kind)
+    if kind == 'branco':
+        return register_vote(candidate, 'Voto em branco registrado com sucesso.')
+    return register_vote(candidate, 'Voto nulo registrado com sucesso.')
 
 
 @app.route('/resultados')
 def results():
     poll = current_poll()
     total = Vote.query.filter_by(poll_id=poll.id).count()
-    candidates = Candidate.query.order_by(Candidate.number.asc(), Candidate.name.asc()).all()
+    candidates = Candidate.query.filter(Candidate.number.in_(VALID_NUMBERS)).order_by(
+        Candidate.number.asc(), Candidate.name.asc()
+    ).all()
+
     rows = []
     for c in candidates:
         count = Vote.query.filter_by(poll_id=poll.id, candidate_id=c.id).count()
         pct = (count / total * 100) if total else 0
         rows.append({'candidate': c, 'votes': count, 'pct': pct})
     rows.sort(key=lambda x: x['votes'], reverse=True)
-    return render_template('results.html', poll=poll, rows=rows, total=total)
+
+    blank_candidate = Candidate.query.filter_by(number=SPECIAL_CANDIDATES['branco']['number']).first()
+    null_candidate = Candidate.query.filter_by(number=SPECIAL_CANDIDATES['nulo']['number']).first()
+    blank_votes = Vote.query.filter_by(poll_id=poll.id, candidate_id=blank_candidate.id).count() if blank_candidate else 0
+    null_votes = Vote.query.filter_by(poll_id=poll.id, candidate_id=null_candidate.id).count() if null_candidate else 0
+    blank_pct = (blank_votes / total * 100) if total else 0
+    null_pct = (null_votes / total * 100) if total else 0
+
+    return render_template(
+        'results.html',
+        poll=poll,
+        rows=rows,
+        total=total,
+        blank_votes=blank_votes,
+        null_votes=null_votes,
+        blank_pct=blank_pct,
+        null_pct=null_pct,
+    )
 
 
 @app.route('/admin/login', methods=['GET', 'POST'])
@@ -165,7 +221,7 @@ def admin():
             db.session.commit()
             flash('Votos da pesquisa atual foram zerados.', 'success')
 
-    candidates = Candidate.query.order_by(Candidate.number.asc(), Candidate.name.asc()).all()
+    candidates = Candidate.query.filter(~Candidate.number.in_([SPECIAL_CANDIDATES['branco']['number'], SPECIAL_CANDIDATES['nulo']['number']])).order_by(Candidate.number.asc(), Candidate.name.asc()).all()
     total = Vote.query.filter_by(poll_id=poll.id).count()
     return render_template('admin.html', poll=poll, candidates=candidates, total=total)
 
