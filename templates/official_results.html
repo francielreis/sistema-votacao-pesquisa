@@ -1007,7 +1007,7 @@
   }
 
   function speakRobot(data, force) {
-    if (!('speechSynthesis' in window) || !data) return;
+    if (!('speechSynthesis' in window)) return;
     const signature = robotSignature(data);
     if (!force && signature === lastSpokenSignature) return;
 
@@ -1096,6 +1096,7 @@
 
   function unlockRobotVoiceFromAnyInteraction() {
     if (!robotVoiceEnabled) return;
+    if (robotUserGestureSeen && robotVoiceUnlocked) return;
 
     robotUserGestureSeen = true;
     robotVoiceUnlocked = true;
@@ -1109,8 +1110,9 @@
       speakRobot(latestOfficialData, true);
     } else {
       robotPendingAfterGesture = true;
+      speakRobot(null, true);
       if (els.robotVoiceStatus) {
-        els.robotVoiceStatus.textContent = 'Voz liberada — aguardando os dados oficiais para falar';
+        els.robotVoiceStatus.textContent = 'Voz liberada — o robô falará agora e atualizará quando os dados do TSE chegarem';
         els.robotVoiceStatus.classList.add('active');
       }
     }
@@ -1122,6 +1124,14 @@
   document.addEventListener('keydown', unlockRobotVoiceFromAnyInteraction);
 
   updateRobotVoiceUI();
+
+  // Tenta a saudação imediatamente. Em navegadores móveis, o áudio pode ser
+  // bloqueado até a primeira interação; nesse caso, o primeiro toque na tela
+  // chama unlockRobotVoiceFromAnyInteraction() e reproduz a saudação.
+  if (robotVoiceEnabled) {
+    robotAutoAttempted = true;
+    speakRobot(null, true);
+  }
 
   async function loadRegionResults() {
     try {
