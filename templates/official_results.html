@@ -1291,10 +1291,11 @@
     unlockRobotVoiceFromAnyInteraction();
   }
 
-  // O primeiro toque/clique/tecla em qualquer área da página libera a voz.
-  // touchstart cobre navegadores Android que não disparam Pointer Events de forma confiável.
-  document.addEventListener('touchstart', handleFirstRobotGesture, { passive: true, capture: true });
-  document.addEventListener('pointerdown', handleFirstRobotGesture, { passive: true, capture: true });
+  // No Android, iniciar no touchstart/pointerdown pode acontecer cedo demais
+  // para a permissão temporária de áudio. O evento click é disparado ao concluir
+  // um toque normal e mantém a ativação do usuário disponível para speechSynthesis.
+  // Como usamos capture=true no document, funciona em qualquer área da página
+  // antes dos handlers específicos do elemento tocado.
   document.addEventListener('click', handleFirstRobotGesture, { capture: true });
   document.addEventListener('keydown', handleFirstRobotGesture, { capture: true });
 
