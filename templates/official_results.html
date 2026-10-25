@@ -149,6 +149,55 @@
     font-size: .78rem;
     font-weight: 700;
   }
+  .robot-voice-controls {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 11px;
+  }
+  .robot-voice-btn {
+    border: 0;
+    border-radius: 999px;
+    padding: 9px 13px;
+    cursor: pointer;
+    font-weight: 900;
+    font-size: .78rem;
+    background: #0f5fc2;
+    color: #fff;
+    box-shadow: 0 6px 14px rgba(15,95,194,.22);
+  }
+  .robot-voice-btn.secondary {
+    background: #e8eef7;
+    color: #334155;
+    box-shadow: none;
+  }
+  .robot-voice-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    font-size: .72rem;
+    color: #64748b;
+    font-weight: 800;
+  }
+  .robot-voice-status::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #94a3b8;
+  }
+  .robot-voice-status.active::before {
+    background: #22c55e;
+    box-shadow: 0 0 0 4px rgba(34,197,94,.13);
+  }
+  .reis-robot.speaking .reis-robot-mouth {
+    animation: robotTalk .22s ease-in-out infinite alternate;
+  }
+  @keyframes robotTalk {
+    from { width: 16px; height: 4px; }
+    to { width: 28px; height: 9px; }
+  }
   @keyframes robotFloat {
     0%,100% { transform: translateY(0); }
     50% { transform: translateY(-6px); }
@@ -313,6 +362,9 @@
     .reis-robot-bubble { flex: 1; padding: 11px 12px; border-radius: 14px; font-size: .77rem; line-height: 1.3; }
     .reis-robot-bubble::before { left: -8px; top: 27px; border-top-width: 8px; border-bottom-width: 8px; border-right-width: 9px; }
     .reis-robot-bubble small { font-size: .66rem; margin-top: 4px; }
+    .robot-voice-controls { gap: 6px; margin-top: 8px; }
+    .robot-voice-btn { padding: 7px 10px; font-size: .68rem; }
+    .robot-voice-status { font-size: .62rem; margin-top: 6px; }
 
     .mobile-live-strip {
       display: grid;
@@ -388,7 +440,7 @@
   </div>
 
   <div class="reis-robot-wrap" aria-label="Assistente Reis Tech e Software">
-    <div class="reis-robot" aria-hidden="true">
+    <div id="reisRobot" class="reis-robot" aria-hidden="true">
       <div class="reis-robot-head">
         <span class="reis-robot-eye left"></span>
         <span class="reis-robot-eye right"></span>
@@ -401,9 +453,17 @@
       <span class="reis-robot-arm right"></span>
     </div>
     <div class="reis-robot-bubble">
-      Olá! Eu sou o robô da <strong>Reis Tech e Software</strong>.<br>
-      Estou exibindo <strong>dados oficiais em tempo real do TSE — Tribunal Superior Eleitoral</strong>.
-      <small>Este painel é independente e acompanha os arquivos públicos oficiais de totalização.</small>
+      <div id="robotSpeechText">
+        Olá! Eu sou o robô da <strong>Reis Tech e Software</strong>.<br>
+        Estou acompanhando <strong>dados oficiais em tempo real do TSE — Tribunal Superior Eleitoral</strong>.<br>
+        Carregando os percentuais dos candidatos…
+      </div>
+      <small id="robotSpeechMeta">Os dados são atualizados automaticamente a cada 10 segundos.</small>
+      <div class="robot-voice-controls">
+        <button id="robotVoiceToggle" class="robot-voice-btn" type="button">🔊 Ativar voz</button>
+        <button id="robotSpeakNow" class="robot-voice-btn secondary" type="button">▶️ Falar agora</button>
+      </div>
+      <div id="robotVoiceStatus" class="robot-voice-status">Voz automática desligada</div>
     </div>
   </div>
 
@@ -547,6 +607,9 @@
   const candidateColors = ['#2563eb', '#16a34a', '#7c3aed', '#ea580c'];
   let regionData = null;
   let selectedRegion = 'Nordeste';
+  let latestOfficialData = null;
+  let robotVoiceEnabled = false;
+  let lastSpokenSignature = '';
 
   const els = {
     status: document.getElementById('status'),
@@ -560,6 +623,12 @@
     candidates: document.getElementById('candidates'),
     updated: document.getElementById('updated'),
     mobileUpdated: document.getElementById('mobileUpdated'),
+    reisRobot: document.getElementById('reisRobot'),
+    robotSpeechText: document.getElementById('robotSpeechText'),
+    robotSpeechMeta: document.getElementById('robotSpeechMeta'),
+    robotVoiceToggle: document.getElementById('robotVoiceToggle'),
+    robotSpeakNow: document.getElementById('robotSpeakNow'),
+    robotVoiceStatus: document.getElementById('robotVoiceStatus'),
     brazilMap: document.getElementById('brazilMap'),
     mapLegend: document.getElementById('mapLegend'),
     regionDetail: document.getElementById('regionDetail'),
@@ -805,6 +874,117 @@
     });
   }
 
+  function robotSignature(data) {
+    if (!data) return '';
+    const candidates = (data.candidates || []).map(function(candidate) {
+      return [
+        candidate.number || '',
+        Number(candidate.pct || 0).toFixed(2),
+        Number(candidate.votes || 0)
+      ].join(':');
+    }).join('|');
+    return candidates + '|sections:' + Number(data.sections?.pct || 0).toFixed(2);
+  }
+
+  function robotSpeech(data) {
+    if (!data) return 'Aguardando os dados oficiais do Tribunal Superior Eleitoral.';
+    const candidates = data.candidates || [];
+    const candidateText = candidates.map(function(candidate) {
+      const pct = Number(candidate.pct || 0).toLocaleString('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+      return (candidate.name || 'Candidato') + ', ' + pct + ' por cento';
+    }).join('. ');
+
+    const sections = Number(data.sections?.pct || 0).toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+
+    return 'Reis Tech e Software informa. Dados oficiais em tempo real do TSE, Tribunal Superior Eleitoral. ' +
+      candidateText + '. ' + sections + ' por cento das seções totalizadas.';
+  }
+
+  function updateRobotBubble(data) {
+    if (!els.robotSpeechText || !data) return;
+    const rows = (data.candidates || []).map(function(candidate) {
+      return '<strong>' + (candidate.name || 'Candidato') + '</strong>: ' +
+        fmtPct(candidate.pct) + ' • ' + fmtInt(candidate.votes || 0) + ' votos';
+    }).join('<br>');
+
+    els.robotSpeechText.innerHTML =
+      'Olá! Eu sou o robô da <strong>Reis Tech e Software</strong>.<br>' +
+      'Dados oficiais em tempo real do <strong>TSE — Tribunal Superior Eleitoral</strong>.<br>' +
+      rows;
+
+    if (els.robotSpeechMeta) {
+      const time = data.generated_time || '--:--';
+      els.robotSpeechMeta.textContent =
+        'Seções totalizadas: ' + fmtPct(data.sections?.pct || 0) +
+        ' • Último arquivo: ' + time +
+        ' • Atualização automática a cada 10 segundos.';
+    }
+  }
+
+  function setRobotSpeaking(active) {
+    if (!els.reisRobot) return;
+    els.reisRobot.classList.toggle('speaking', Boolean(active));
+  }
+
+  function speakRobot(data, force) {
+    if (!('speechSynthesis' in window) || !data) return;
+    const signature = robotSignature(data);
+    if (!force && signature === lastSpokenSignature) return;
+
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(robotSpeech(data));
+    utterance.lang = 'pt-BR';
+    utterance.rate = 0.93;
+    utterance.pitch = 1;
+    utterance.volume = 1;
+    utterance.onstart = function() { setRobotSpeaking(true); };
+    utterance.onend = function() { setRobotSpeaking(false); };
+    utterance.onerror = function() { setRobotSpeaking(false); };
+
+    window.speechSynthesis.speak(utterance);
+    lastSpokenSignature = signature;
+  }
+
+  function updateRobotVoiceUI() {
+    if (els.robotVoiceToggle) {
+      els.robotVoiceToggle.textContent = robotVoiceEnabled ? '🔇 Desativar voz' : '🔊 Ativar voz';
+    }
+    if (els.robotVoiceStatus) {
+      els.robotVoiceStatus.textContent = robotVoiceEnabled
+        ? 'Voz automática ligada — o robô fala quando os dados mudarem'
+        : 'Voz automática desligada';
+      els.robotVoiceStatus.classList.toggle('active', robotVoiceEnabled);
+    }
+  }
+
+  if (els.robotVoiceToggle) {
+    els.robotVoiceToggle.addEventListener('click', function() {
+      robotVoiceEnabled = !robotVoiceEnabled;
+      updateRobotVoiceUI();
+
+      if (robotVoiceEnabled && latestOfficialData) {
+        speakRobot(latestOfficialData, true);
+      } else if (!robotVoiceEnabled && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        setRobotSpeaking(false);
+      }
+    });
+  }
+
+  if (els.robotSpeakNow) {
+    els.robotSpeakNow.addEventListener('click', function() {
+      if (latestOfficialData) speakRobot(latestOfficialData, true);
+    });
+  }
+
+  updateRobotVoiceUI();
+
   async function loadRegionResults() {
     try {
       const dataResponse = await fetch('{{ url_for("official_regions_api") }}', { cache: 'no-store' });
@@ -843,7 +1023,13 @@
       els.votesNull.textContent = fmtInt(data.votes.null);
       els.electorate.textContent = fmtInt(data.electorate.total);
 
+      latestOfficialData = data;
       renderCandidates(data.candidates);
+      updateRobotBubble(data);
+
+      if (robotVoiceEnabled) {
+        speakRobot(data, false);
+      }
 
       if (Number(data.sections.counted || 0) === 0) {
         els.status.textContent = 'Aguardando o início da totalização oficial do TSE.';
