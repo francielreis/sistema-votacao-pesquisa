@@ -9,6 +9,154 @@
   .source-note { opacity: .82; margin-top: 8px; line-height: 1.45; }
   .source-note a { color: #7dd3fc; font-weight: 800; }
   .mobile-live-strip { display: none; }
+
+  .reis-robot-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    margin: 16px auto 18px;
+    max-width: 760px;
+  }
+  .reis-robot {
+    position: relative;
+    width: 118px;
+    height: 142px;
+    flex: 0 0 auto;
+    animation: robotFloat 2.8s ease-in-out infinite;
+  }
+  .reis-robot-head {
+    width: 82px;
+    height: 58px;
+    margin: 0 auto;
+    border-radius: 20px;
+    background: linear-gradient(180deg,#e8f2ff,#a9c9f7);
+    border: 3px solid #5b8fd8;
+    position: relative;
+    box-shadow: inset 0 -8px 14px rgba(0,0,0,.08), 0 8px 18px rgba(0,0,0,.18);
+  }
+  .reis-robot-head::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: -16px;
+    width: 3px;
+    height: 16px;
+    background: #8db3e8;
+    transform: translateX(-50%);
+  }
+  .reis-robot-head::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: -22px;
+    width: 10px;
+    height: 10px;
+    background: #ef4444;
+    border-radius: 50%;
+    transform: translateX(-50%);
+    box-shadow: 0 0 0 5px rgba(239,68,68,.12);
+  }
+  .reis-robot-eye {
+    position: absolute;
+    top: 20px;
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    background: #0f172a;
+    box-shadow: inset 0 0 0 3px #7dd3fc, 0 0 10px rgba(125,211,252,.7);
+  }
+  .reis-robot-eye.left { left: 18px; }
+  .reis-robot-eye.right { right: 18px; }
+  .reis-robot-mouth {
+    position: absolute;
+    left: 50%;
+    bottom: 9px;
+    width: 26px;
+    height: 6px;
+    border-radius: 999px;
+    background: #5b8fd8;
+    transform: translateX(-50%);
+  }
+  .reis-robot-body {
+    position: relative;
+    width: 104px;
+    height: 72px;
+    margin: 7px auto 0;
+    border-radius: 22px 22px 18px 18px;
+    background: linear-gradient(180deg,#dcecff,#8eb9ef);
+    border: 3px solid #5b8fd8;
+    box-shadow: inset 0 -10px 16px rgba(0,0,0,.08), 0 10px 18px rgba(0,0,0,.16);
+  }
+  .reis-robot-logo {
+    position: absolute;
+    inset: 14px 10px auto;
+    min-height: 38px;
+    display: grid;
+    place-items: center;
+    border-radius: 10px;
+    background: #0b1324;
+    color: #fff;
+    font-size: .68rem;
+    line-height: 1.12;
+    font-weight: 950;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    text-align: center;
+    padding: 6px;
+    border: 1px solid rgba(255,255,255,.18);
+  }
+  .reis-robot-arm {
+    position: absolute;
+    top: 75px;
+    width: 16px;
+    height: 50px;
+    border-radius: 999px;
+    background: #8eb9ef;
+    border: 3px solid #5b8fd8;
+    transform-origin: top center;
+  }
+  .reis-robot-arm.left { left: -2px; transform: rotate(18deg); }
+  .reis-robot-arm.right { right: -2px; transform: rotate(-24deg); animation: robotWave 1.8s ease-in-out infinite; }
+  .reis-robot-bubble {
+    position: relative;
+    max-width: 470px;
+    padding: 15px 18px;
+    border-radius: 18px;
+    background: #ffffff;
+    color: #182033;
+    font-weight: 850;
+    line-height: 1.38;
+    box-shadow: 0 12px 28px rgba(0,0,0,.18);
+    text-align: left;
+  }
+  .reis-robot-bubble::before {
+    content: '';
+    position: absolute;
+    left: -12px;
+    top: 34px;
+    width: 0;
+    height: 0;
+    border-top: 11px solid transparent;
+    border-bottom: 11px solid transparent;
+    border-right: 14px solid #fff;
+  }
+  .reis-robot-bubble strong { color: #0f5fc2; }
+  .reis-robot-bubble small {
+    display: block;
+    margin-top: 6px;
+    color: #64748b;
+    font-size: .78rem;
+    font-weight: 700;
+  }
+  @keyframes robotFloat {
+    0%,100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+  @keyframes robotWave {
+    0%,100% { transform: rotate(-24deg); }
+    50% { transform: rotate(-48deg); }
+  }
   .status-box { margin: 18px 0; padding: 14px 16px; border-radius: 14px; background: rgba(0,0,0,.06); font-weight: 700; text-align: center; }
   .summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; margin: 18px 0 24px; }
   .metric { border: 1px solid rgba(127,127,127,.25); border-radius: 16px; padding: 16px; background: rgba(255,255,255,.04); }
@@ -148,6 +296,23 @@
     .live-badge { font-size: .76rem; gap: 7px; }
     .live-dot { width: 8px; height: 8px; }
     .source-note { font-size: .79rem; margin-top: 6px; }
+    .reis-robot-wrap { gap: 9px; margin: 11px 0 13px; align-items: center; }
+    .reis-robot { width: 84px; height: 108px; }
+    .reis-robot-head { width: 58px; height: 43px; border-radius: 15px; border-width: 2px; }
+    .reis-robot-head::before { top: -12px; height: 12px; width: 2px; }
+    .reis-robot-head::after { top: -17px; width: 8px; height: 8px; }
+    .reis-robot-eye { top: 14px; width: 10px; height: 10px; box-shadow: inset 0 0 0 2px #7dd3fc; }
+    .reis-robot-eye.left { left: 12px; }
+    .reis-robot-eye.right { right: 12px; }
+    .reis-robot-mouth { bottom: 6px; width: 18px; height: 4px; }
+    .reis-robot-body { width: 74px; height: 55px; margin-top: 5px; border-width: 2px; border-radius: 16px; }
+    .reis-robot-logo { inset: 10px 6px auto; min-height: 30px; font-size: .48rem; padding: 4px; border-radius: 7px; }
+    .reis-robot-arm { top: 56px; width: 12px; height: 38px; border-width: 2px; }
+    .reis-robot-arm.left { left: 2px; }
+    .reis-robot-arm.right { right: 2px; }
+    .reis-robot-bubble { flex: 1; padding: 11px 12px; border-radius: 14px; font-size: .77rem; line-height: 1.3; }
+    .reis-robot-bubble::before { left: -8px; top: 27px; border-top-width: 8px; border-bottom-width: 8px; border-right-width: 9px; }
+    .reis-robot-bubble small { font-size: .66rem; margin-top: 4px; }
 
     .mobile-live-strip {
       display: grid;
@@ -219,6 +384,26 @@
       <div class="mobile-live-item"><strong>TSE</strong>fonte oficial</div>
       <div class="mobile-live-item"><strong>10 s</strong>atualização</div>
       <div class="mobile-live-item"><strong id="mobileUpdated">{% if official_data and official_data.generated_time %}{{ official_data.generated_time }}{% else %}--:--{% endif %}</strong>último arquivo</div>
+    </div>
+  </div>
+
+  <div class="reis-robot-wrap" aria-label="Assistente Reis Tech e Software">
+    <div class="reis-robot" aria-hidden="true">
+      <div class="reis-robot-head">
+        <span class="reis-robot-eye left"></span>
+        <span class="reis-robot-eye right"></span>
+        <span class="reis-robot-mouth"></span>
+      </div>
+      <div class="reis-robot-body">
+        <div class="reis-robot-logo">Reis Tech<br>e Software</div>
+      </div>
+      <span class="reis-robot-arm left"></span>
+      <span class="reis-robot-arm right"></span>
+    </div>
+    <div class="reis-robot-bubble">
+      Olá! Eu sou o robô da <strong>Reis Tech e Software</strong>.<br>
+      Estou exibindo <strong>dados oficiais em tempo real do TSE — Tribunal Superior Eleitoral</strong>.
+      <small>Este painel é independente e acompanha os arquivos públicos oficiais de totalização.</small>
     </div>
   </div>
 
