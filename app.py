@@ -95,6 +95,10 @@ def _normalize_tse_results(payload):
     sections = payload.get('s') or {}
     voters = payload.get('e') or {}
     votes = payload.get('v') or {}
+    valid_votes = sum(candidate['votes'] for candidate in candidates)
+    blank_votes = _safe_int(votes.get('vb'))
+    null_votes = _safe_int(votes.get('vn'))
+    total_votes = _safe_int(votes.get('tv')) or (valid_votes + blank_votes + null_votes)
 
     return {
         'ok': True,
@@ -114,10 +118,10 @@ def _normalize_tse_results(payload):
             'counted': _safe_int(voters.get('est')),
         },
         'votes': {
-            'total': _safe_int(votes.get('tv')),
-            'valid': _safe_int(votes.get('vv')),
-            'blank': _safe_int(votes.get('vb')),
-            'null': _safe_int(votes.get('vn')),
+            'total': total_votes,
+            'valid': valid_votes,
+            'blank': blank_votes,
+            'null': null_votes,
         },
         'candidates': candidates,
         'stale': False,
