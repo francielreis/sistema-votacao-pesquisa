@@ -24,10 +24,37 @@
   .chart-title { margin: 6px 0 14px; font-size: 1.05rem; font-weight: 900; }
   .updated { text-align: center; margin-top: 18px; opacity: .7; font-size: .9rem; }
   .official-disclaimer { margin-top: 20px; padding: 14px; border-left: 4px solid #1976d2; background: rgba(25,118,210,.08); border-radius: 10px; }
+  .region-section { margin-top: 30px; padding-top: 22px; border-top: 1px solid rgba(127,127,127,.25); }
+  .region-section h2 { margin: 0 0 8px; }
+  .region-subtitle { opacity: .72; margin-bottom: 16px; }
+  .region-map-layout { display: grid; grid-template-columns: minmax(0,1.25fr) minmax(280px,.75fr); gap: 18px; align-items: start; }
+  .map-panel, .region-detail { border: 1px solid rgba(127,127,127,.25); border-radius: 18px; padding: 14px; background: rgba(255,255,255,.035); }
+  #brazilMap { width: 100%; height: auto; min-height: 460px; display: block; }
+  .region-shape { stroke: rgba(255,255,255,.92); stroke-width: 1.4; cursor: pointer; transition: opacity .2s ease, filter .2s ease; }
+  .region-shape:hover { filter: brightness(1.08); }
+  .region-label { pointer-events: none; text-anchor: middle; font-weight: 900; fill: #fff; paint-order: stroke; stroke: rgba(0,0,0,.65); stroke-width: 3px; stroke-linejoin: round; }
+  .region-pct-label { pointer-events: none; text-anchor: middle; font-weight: 800; fill: #fff; paint-order: stroke; stroke: rgba(0,0,0,.65); stroke-width: 2.5px; }
+  .region-detail-title { font-size: 1.3rem; font-weight: 950; margin-bottom: 4px; }
+  .region-detail-meta { opacity: .72; margin-bottom: 12px; }
+  .region-candidate { padding: 12px 0; border-top: 1px solid rgba(127,127,127,.18); }
+  .region-candidate:first-of-type { border-top: 0; }
+  .region-candidate-head { display: flex; justify-content: space-between; gap: 10px; }
+  .region-candidate-pct { font-weight: 950; font-size: 1.2rem; }
+  .region-mini-bar { height: 10px; border-radius: 999px; background: rgba(127,127,127,.17); margin-top: 8px; overflow: hidden; }
+  .region-mini-fill { height: 100%; border-radius: inherit; transition: width .6s ease; }
+  .region-grid { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 9px; margin-top: 14px; }
+  .region-pill { border: 1px solid rgba(127,127,127,.22); border-radius: 12px; padding: 10px; text-align: center; cursor: pointer; background: rgba(255,255,255,.03); }
+  .region-pill strong { display: block; margin-bottom: 4px; }
+  .region-pill span { font-size: .8rem; opacity: .76; }
+  .map-legend { display:flex; flex-wrap:wrap; gap:10px; margin-top:10px; font-size:.86rem; opacity:.85; }
+  .legend-dot { width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:5px; }
   @media (max-width: 760px) {
     .summary-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
     .candidate-top { align-items: center; }
     .candidate-pct { font-size: 1.45rem; }
+    .region-map-layout { grid-template-columns: 1fr; }
+    .region-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+    #brazilMap { min-height: 390px; }
   }
 </style>
 
@@ -83,6 +110,25 @@
 
   <div id="updated" class="updated">Aguardando atualização…</div>
 
+  <section class="region-section">
+    <h2>Mapa da apuração pelas 5 regiões do Brasil</h2>
+    <div class="region-subtitle">Toque em uma região para ver porcentagem, total de votos e seções totalizadas. Consolidação dos arquivos oficiais do TSE por estado.</div>
+
+    <div class="region-map-layout">
+      <div class="map-panel">
+        <svg id="brazilMap" viewBox="0 0 760 700" role="img" aria-label="Mapa do Brasil dividido nas cinco grandes regiões"></svg>
+        <div id="mapLegend" class="map-legend"></div>
+      </div>
+      <aside id="regionDetail" class="region-detail">
+        <div class="region-detail-title">Carregando regiões…</div>
+        <div class="region-detail-meta">Consultando os arquivos estaduais do TSE.</div>
+      </aside>
+    </div>
+
+    <div id="regionGrid" class="region-grid"></div>
+    <div id="regionUpdated" class="updated">Atualização regional em preparação…</div>
+  </section>
+
   <div class="official-disclaimer">
     <strong>Importante:</strong> este é um painel independente. Os números exibidos vêm dos arquivos públicos de totalização do TSE e não são projeções nem resultados do simulador de votação.
   </div>
@@ -96,6 +142,18 @@
     maximumFractionDigits: 2
   }) + '%';
 
+  const regionColors = {
+    'Norte': '#0f766e',
+    'Nordeste': '#b45309',
+    'Centro-Oeste': '#7c3aed',
+    'Sudeste': '#2563eb',
+    'Sul': '#be123c'
+  };
+  const candidateColors = ['#2563eb', '#16a34a', '#7c3aed', '#ea580c'];
+  let regionGeo = null;
+  let regionData = null;
+  let selectedRegion = 'Nordeste';
+
   const els = {
     status: document.getElementById('status'),
     sectionsPct: document.getElementById('sectionsPct'),
@@ -106,7 +164,12 @@
     votesNull: document.getElementById('votesNull'),
     electorate: document.getElementById('electorate'),
     candidates: document.getElementById('candidates'),
-    updated: document.getElementById('updated')
+    updated: document.getElementById('updated'),
+    brazilMap: document.getElementById('brazilMap'),
+    mapLegend: document.getElementById('mapLegend'),
+    regionDetail: document.getElementById('regionDetail'),
+    regionGrid: document.getElementById('regionGrid'),
+    regionUpdated: document.getElementById('regionUpdated')
   };
 
   function renderCandidates(candidates) {
@@ -158,6 +221,230 @@
     });
   }
 
+
+  function collectCoords(geometry, output) {
+    const visit = (coords) => {
+      if (!Array.isArray(coords)) return;
+      if (typeof coords[0] === 'number' && typeof coords[1] === 'number') {
+        output.push(coords);
+        return;
+      }
+      coords.forEach(visit);
+    };
+    visit(geometry.coordinates);
+  }
+
+  function geoBounds(geo) {
+    const pts = [];
+    geo.features.forEach(f => collectCoords(f.geometry, pts));
+    const lons = pts.map(p => p[0]);
+    const lats = pts.map(p => p[1]);
+    return {
+      minLon: Math.min(...lons), maxLon: Math.max(...lons),
+      minLat: Math.min(...lats), maxLat: Math.max(...lats)
+    };
+  }
+
+  function projectPoint(point, bounds, width=760, height=700, pad=35) {
+    const x = pad + ((point[0] - bounds.minLon) / (bounds.maxLon - bounds.minLon)) * (width - pad * 2);
+    const y = pad + ((bounds.maxLat - point[1]) / (bounds.maxLat - bounds.minLat)) * (height - pad * 2);
+    return [x, y];
+  }
+
+  function geometryPath(geometry, bounds) {
+    const polygons = geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates;
+    let d = '';
+    polygons.forEach(poly => {
+      poly.forEach(ring => {
+        ring.forEach((point, index) => {
+          const [x, y] = projectPoint(point, bounds);
+          d += (index === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1);
+        });
+        d += 'Z';
+      });
+    });
+    return d;
+  }
+
+  function featureCenter(feature, bounds) {
+    const pts = [];
+    collectCoords(feature.geometry, pts);
+    const projected = pts.map(p => projectPoint(p, bounds));
+    const xs = projected.map(p => p[0]);
+    const ys = projected.map(p => p[1]);
+    return [(Math.min(...xs)+Math.max(...xs))/2, (Math.min(...ys)+Math.max(...ys))/2];
+  }
+
+  function regionByName(name) {
+    return (regionData?.regions || []).find(r => r.name === name);
+  }
+
+  function renderRegionDetail(name) {
+    const region = regionByName(name);
+    if (!region) return;
+    selectedRegion = name;
+
+    els.regionDetail.replaceChildren();
+
+    const title = document.createElement('div');
+    title.className = 'region-detail-title';
+    title.textContent = region.name;
+
+    const meta = document.createElement('div');
+    meta.className = 'region-detail-meta';
+    meta.textContent = region.states.join(', ') + ' • ' + fmtPct(region.sections.pct) + ' das seções totalizadas';
+
+    els.regionDetail.append(title, meta);
+
+    (region.candidates || []).forEach((candidate, index) => {
+      const row = document.createElement('div');
+      row.className = 'region-candidate';
+
+      const head = document.createElement('div');
+      head.className = 'region-candidate-head';
+
+      const left = document.createElement('div');
+      const strong = document.createElement('strong');
+      strong.textContent = candidate.name;
+      const small = document.createElement('div');
+      small.style.opacity = '.72';
+      small.style.fontSize = '.85rem';
+      small.textContent = (candidate.party ? candidate.party + ' • ' : '') + 'nº ' + candidate.number + ' • ' + fmtInt(candidate.votes) + ' votos';
+      left.append(strong, small);
+
+      const pct = document.createElement('div');
+      pct.className = 'region-candidate-pct';
+      pct.textContent = fmtPct(candidate.pct);
+
+      head.append(left, pct);
+
+      const track = document.createElement('div');
+      track.className = 'region-mini-bar';
+      const fill = document.createElement('div');
+      fill.className = 'region-mini-fill';
+      fill.style.width = Math.max(0, Math.min(100, Number(candidate.pct || 0))) + '%';
+      fill.style.background = candidateColors[index % candidateColors.length];
+      track.append(fill);
+
+      row.append(head, track);
+      els.regionDetail.append(row);
+    });
+
+    const totals = document.createElement('div');
+    totals.style.marginTop = '12px';
+    totals.style.fontSize = '.88rem';
+    totals.style.opacity = '.76';
+    totals.textContent = 'Votos válidos: ' + fmtInt(region.votes.valid) +
+      ' • Brancos: ' + fmtInt(region.votes.blank) +
+      ' • Nulos: ' + fmtInt(region.votes.null);
+    els.regionDetail.append(totals);
+
+    renderRegionMap();
+  }
+
+  function renderRegionGrid() {
+    els.regionGrid.replaceChildren();
+    (regionData?.regions || []).forEach(region => {
+      const pill = document.createElement('button');
+      pill.type = 'button';
+      pill.className = 'region-pill';
+      pill.style.borderColor = selectedRegion === region.name ? regionColors[region.name] : '';
+      const leader = region.candidates?.[0];
+      pill.innerHTML = '<strong>' + region.name + '</strong><span>' +
+        (leader ? leader.name + ' ' + fmtPct(leader.pct) : 'Aguardando votos') + '</span>';
+      pill.addEventListener('click', () => renderRegionDetail(region.name));
+      els.regionGrid.append(pill);
+    });
+  }
+
+  function renderRegionMap() {
+    if (!regionGeo || !regionData) return;
+    els.brazilMap.replaceChildren();
+    const bounds = geoBounds(regionGeo);
+
+    regionGeo.features.forEach(feature => {
+      const name = feature.properties.region;
+      const region = regionByName(name);
+      if (!region) return;
+
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', geometryPath(feature.geometry, bounds));
+      path.setAttribute('fill', regionColors[name] || '#64748b');
+      path.setAttribute('class', 'region-shape');
+      path.setAttribute('opacity', selectedRegion === name ? '1' : '.78');
+      path.setAttribute('aria-label', name);
+      path.addEventListener('click', () => {
+        renderRegionDetail(name);
+        renderRegionGrid();
+      });
+      els.brazilMap.append(path);
+
+      let [cx, cy] = featureCenter(feature, bounds);
+      if (name === 'Nordeste') { cx += 18; cy -= 4; }
+      if (name === 'Centro-Oeste') { cx -= 5; cy += 4; }
+      if (name === 'Sudeste') { cx += 6; cy += 8; }
+      if (name === 'Sul') { cx += 8; cy += 6; }
+
+      const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      label.setAttribute('x', cx);
+      label.setAttribute('y', cy - 8);
+      label.setAttribute('class', 'region-label');
+      label.setAttribute('font-size', '17');
+      label.textContent = name;
+      els.brazilMap.append(label);
+
+      const candidates = region.candidates || [];
+      candidates.slice(0,2).forEach((candidate, index) => {
+        const pct = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        pct.setAttribute('x', cx);
+        pct.setAttribute('y', cy + 14 + index * 18);
+        pct.setAttribute('class', 'region-pct-label');
+        pct.setAttribute('font-size', '13');
+        pct.textContent = candidate.number + ': ' + fmtPct(candidate.pct);
+        els.brazilMap.append(pct);
+      });
+    });
+
+    els.mapLegend.replaceChildren();
+    (regionData.regions?.[0]?.candidates || []).slice(0,2).forEach((candidate, index) => {
+      const item = document.createElement('span');
+      const dot = document.createElement('span');
+      dot.className = 'legend-dot';
+      dot.style.background = candidateColors[index % candidateColors.length];
+      item.append(dot, document.createTextNode(candidate.number + ' — ' + candidate.name));
+      els.mapLegend.append(item);
+    });
+  }
+
+  async function loadRegionResults() {
+    try {
+      const [geoResponse, dataResponse] = await Promise.all([
+        regionGeo ? Promise.resolve(null) : fetch('{{ url_for("static", filename="brazil-regions-ibge.json") }}', { cache: 'force-cache' }),
+        fetch('{{ url_for("official_regions_api") }}', { cache: 'no-store' })
+      ]);
+
+      if (geoResponse) {
+        regionGeo = await geoResponse.json();
+      }
+      const data = await dataResponse.json();
+      if (!dataResponse.ok || !data.ok) throw new Error(data.error || 'Falha regional');
+
+      regionData = data;
+      if (!regionByName(selectedRegion)) selectedRegion = data.regions?.[0]?.name || 'Norte';
+
+      renderRegionDetail(selectedRegion);
+      renderRegionGrid();
+      renderRegionMap();
+
+      els.regionUpdated.textContent = data.stale && data.warning
+        ? data.warning
+        : 'Mapa regional atualizado automaticamente a cada ' + (data.refresh_seconds || 30) + ' segundos.';
+    } catch (error) {
+      els.regionUpdated.textContent = 'Não foi possível atualizar o mapa regional agora. Nova tentativa automática será feita.';
+    }
+  }
+
+
   async function loadResults() {
     try {
       const response = await fetch('{{ url_for("official_results_api") }}', { cache: 'no-store' });
@@ -199,7 +486,9 @@
   }
 
   loadResults();
+  loadRegionResults();
   window.setInterval(loadResults, 10000);
+  window.setInterval(loadRegionResults, 30000);
 })();
 </script>
 {% endblock %}
