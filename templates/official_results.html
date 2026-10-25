@@ -240,8 +240,9 @@
     width: 102px;
     height: 102px;
     border-radius: 50%;
-    object-fit: cover;
-    background: #eef1f5;
+    object-fit: contain;
+    object-position: center;
+    background: #fff;
     border: 5px solid #fff;
     display: block;
   }
@@ -395,7 +396,7 @@
     .candidate-top { grid-template-columns: 76px minmax(0,1fr); gap: 12px; align-items: center; }
     .candidate-avatar-ring { width: 74px; height: 74px; padding: 4px; }
     .candidate-avatar, .candidate-avatar-fallback { width: 66px; height: 66px; border-width: 3px; }
-    .candidate-avatar { object-fit: cover; object-position: center 18%; }
+    .candidate-avatar { object-fit: contain; object-position: center; background: #fff; }
     .candidate-avatar-fallback { font-size: 1.25rem; }
     .candidate-info { align-self: end; }
     .candidate-party { font-size: .76rem; margin-bottom: 4px; letter-spacing: .01em; }
