@@ -1,29 +1,233 @@
 {% extends 'base.html' %}
 {% block content %}
-<section class="hero">
-  <span class="eyebrow">PESQUISA SIMULADA</span>
+<section class="hero urna-hero">
+  <span class="eyebrow">SIMULADOR DE URNA — PESQUISA</span>
   <h1>{{ poll.title }}</h1>
-  <p>Selecione uma opção. O sistema permite um voto por navegador na pesquisa atual.</p>
+  <p>Digite o número da opção desejada e pressione <strong>CONFIRMA</strong>. Este ambiente é apenas uma simulação de pesquisa.</p>
 </section>
 
 {% if already_voted %}
-<div class="alert warning">Você já participou desta pesquisa neste dispositivo. <a href="{{ url_for('results') }}">Ver resultados</a>.</div>
+<div class="alert warning">Este navegador já registrou um voto nesta pesquisa. <a href="{{ url_for('results') }}">Ver resultados</a>.</div>
 {% endif %}
 
-<div class="cards">
-  {% for c in candidates %}
-  <article class="candidate-card">
-    {% if c.photo_url %}<img src="{{ c.photo_url }}" alt="Foto de {{ c.name }}">{% else %}<div class="avatar">{{ c.name[:1]|upper }}</div>{% endif %}
-    <div class="candidate-info">
-      {% if c.number %}<span class="number">{{ c.number }}</span>{% endif %}
-      <h2>{{ c.name }}</h2>
-      <form method="post" action="{{ url_for('vote', candidate_id=c.id) }}">
-        <button type="submit" {% if already_voted %}disabled{% endif %}>Registrar voto</button>
-      </form>
+<section class="urna-wrap" aria-label="Simulador de urna eletrônica para pesquisa">
+  <div class="urna-machine">
+    <div class="urna-screen-panel">
+      <div class="urna-screen" id="urnaScreen">
+        <div class="urna-screen-top">
+          <span>SEU VOTO PARA</span>
+          <strong>PESQUISA SIMULADA</strong>
+        </div>
+
+        <div class="urna-input-row">
+          <span>NÚMERO:</span>
+          <div class="urna-digits" id="urnaDigits" aria-live="polite"></div>
+        </div>
+
+        <div class="urna-candidate" id="candidatePreview">
+          <div class="urna-photo-placeholder" id="candidatePhoto">
+            <span>?</span>
+          </div>
+          <div class="urna-candidate-data">
+            <small>OPÇÃO</small>
+            <h2 id="candidateName">Digite o número</h2>
+            <p id="candidateNumber">Use o teclado ao lado</p>
+          </div>
+        </div>
+
+        <div class="urna-screen-message" id="urnaMessage">
+          Confira os dados antes de confirmar.
+        </div>
+
+        <div class="urna-screen-footer">
+          <strong>SIMULAÇÃO — NÃO É ELEIÇÃO OFICIAL</strong>
+        </div>
+      </div>
     </div>
-  </article>
-  {% else %}
-  <div class="empty">Nenhuma opção cadastrada ainda. Entre no painel administrativo para começar.</div>
-  {% endfor %}
-</div>
+
+    <div class="urna-keyboard-panel">
+      <div class="urna-branding">
+        <strong>PESQUISAVOTO</strong>
+        <span>Terminal de simulação</span>
+      </div>
+
+      <div class="urna-keypad" id="urnaKeypad">
+        {% for n in range(1, 10) %}
+        <button type="button" class="urna-key" data-digit="{{ n }}" {% if already_voted %}disabled{% endif %}>{{ n }}</button>
+        {% endfor %}
+        <span></span>
+        <button type="button" class="urna-key" data-digit="0" {% if already_voted %}disabled{% endif %}>0</button>
+        <span></span>
+      </div>
+
+      <div class="urna-actions">
+        <button type="button" class="urna-action blank" id="blankBtn" {% if already_voted %}disabled{% endif %}>BRANCO</button>
+        <button type="button" class="urna-action correct" id="correctBtn" {% if already_voted %}disabled{% endif %}>CORRIGE</button>
+        <button type="button" class="urna-action confirm" id="confirmBtn" {% if already_voted %}disabled{% endif %}>CONFIRMA</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="urna-options">
+  <div class="urna-options-head">
+    <div>
+      <span class="eyebrow">OPÇÕES CADASTRADAS</span>
+      <h2>Números disponíveis</h2>
+    </div>
+    <a href="{{ url_for('results') }}" class="link-button">Ver resultados</a>
+  </div>
+
+  <div class="urna-option-grid">
+    {% for c in candidates %}
+    <article class="urna-option-card"
+      data-id="{{ c.id }}"
+      data-name="{{ c.name|e }}"
+      data-number="{{ c.number or '' }}"
+      data-photo="{{ c.photo_url or '' }}">
+      {% if c.photo_url %}
+      <img src="{{ c.photo_url }}" alt="Foto de {{ c.name }}">
+      {% else %}
+      <div class="urna-option-avatar">{{ c.name[:1]|upper }}</div>
+      {% endif %}
+      <div>
+        <strong>{{ c.name }}</strong>
+        {% if c.number %}
+        <span>Número {{ c.number }}</span>
+        {% else %}
+        <span>Sem número cadastrado</span>
+        {% endif %}
+      </div>
+      <form method="post" action="{{ url_for('vote', candidate_id=c.id) }}" id="voteForm{{ c.id }}"></form>
+    </article>
+    {% else %}
+    <div class="empty">Nenhuma opção cadastrada ainda. Entre no painel administrativo para começar.</div>
+    {% endfor %}
+  </div>
+</section>
+
+<script>
+(() => {
+  const optionCards = [...document.querySelectorAll('.urna-option-card')];
+  const candidates = optionCards
+    .map(card => ({
+      id: card.dataset.id,
+      name: card.dataset.name,
+      number: card.dataset.number,
+      photo: card.dataset.photo
+    }))
+    .filter(c => c.number);
+
+  const digitsEl = document.getElementById('urnaDigits');
+  const nameEl = document.getElementById('candidateName');
+  const numberEl = document.getElementById('candidateNumber');
+  const photoEl = document.getElementById('candidatePhoto');
+  const messageEl = document.getElementById('urnaMessage');
+  const confirmBtn = document.getElementById('confirmBtn');
+  const correctBtn = document.getElementById('correctBtn');
+  const blankBtn = document.getElementById('blankBtn');
+
+  if (!digitsEl) return;
+
+  const maxDigits = Math.max(2, ...candidates.map(c => c.number.length));
+  let typed = '';
+
+  function renderDigits() {
+    digitsEl.innerHTML = '';
+    for (let i = 0; i < maxDigits; i++) {
+      const box = document.createElement('span');
+      box.className = 'urna-digit-box';
+      box.textContent = typed[i] || '';
+      digitsEl.appendChild(box);
+    }
+  }
+
+  function currentCandidate() {
+    return candidates.find(c => c.number === typed);
+  }
+
+  function renderCandidate() {
+    const candidate = currentCandidate();
+
+    if (!typed) {
+      nameEl.textContent = 'Digite o número';
+      numberEl.textContent = 'Use o teclado ao lado';
+      photoEl.innerHTML = '<span>?</span>';
+      photoEl.style.backgroundImage = '';
+      messageEl.textContent = 'Confira os dados antes de confirmar.';
+      confirmBtn.classList.remove('ready');
+      return;
+    }
+
+    if (candidate) {
+      nameEl.textContent = candidate.name;
+      numberEl.textContent = 'Número ' + candidate.number;
+      if (candidate.photo) {
+        photoEl.innerHTML = '';
+        photoEl.style.backgroundImage = `url("${candidate.photo.replace(/"/g, '&quot;')}")`;
+      } else {
+        photoEl.style.backgroundImage = '';
+        photoEl.innerHTML = '<span>' + candidate.name.charAt(0).toUpperCase() + '</span>';
+      }
+      messageEl.innerHTML = '<strong>CONFIRA:</strong> se os dados estiverem corretos, pressione CONFIRMA.';
+      confirmBtn.classList.add('ready');
+    } else {
+      nameEl.textContent = typed.length >= maxDigits ? 'Número não encontrado' : 'Digitando...';
+      numberEl.textContent = typed;
+      photoEl.innerHTML = '<span>?</span>';
+      photoEl.style.backgroundImage = '';
+      messageEl.textContent = typed.length >= maxDigits ? 'Pressione CORRIGE e tente novamente.' : 'Continue digitando o número.';
+      confirmBtn.classList.remove('ready');
+    }
+  }
+
+  function update() {
+    renderDigits();
+    renderCandidate();
+  }
+
+  document.querySelectorAll('.urna-key[data-digit]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (typed.length >= maxDigits) return;
+      typed += btn.dataset.digit;
+      update();
+    });
+  });
+
+  correctBtn?.addEventListener('click', () => {
+    typed = '';
+    update();
+  });
+
+  blankBtn?.addEventListener('click', () => {
+    typed = '';
+    update();
+    messageEl.textContent = 'Voto em branco não está habilitado nesta pesquisa simulada.';
+  });
+
+  confirmBtn?.addEventListener('click', () => {
+    const candidate = currentCandidate();
+    if (!candidate) {
+      messageEl.textContent = 'Digite um número válido antes de confirmar.';
+      return;
+    }
+    const form = document.getElementById('voteForm' + candidate.id);
+    if (form) form.submit();
+  });
+
+  document.addEventListener('keydown', event => {
+    if (/^[0-9]$/.test(event.key) && typed.length < maxDigits) {
+      typed += event.key;
+      update();
+    } else if (event.key === 'Backspace' || event.key === 'Escape') {
+      typed = '';
+      update();
+    } else if (event.key === 'Enter') {
+      confirmBtn?.click();
+    }
+  });
+
+  update();
+})();
+</script>
 {% endblock %}
