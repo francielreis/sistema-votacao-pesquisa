@@ -41,6 +41,15 @@
     {% endif %}
   </footer>
 
+  <button id="globalVoiceBtn" type="button" aria-label="Ouvir esta página"
+    style="position:fixed;right:14px;bottom:14px;z-index:9999;border:0;border-radius:999px;padding:10px 14px;background:#0f5fc2;color:#fff;font-weight:900;box-shadow:0 8px 22px rgba(0,0,0,.22);cursor:pointer;">
+    🔊 Ouvir página
+  </button>
+
+  <div id="globalVoiceStatus" aria-live="polite"
+    style="position:fixed;right:14px;bottom:62px;z-index:9998;max-width:min(320px,calc(100vw - 28px));padding:8px 11px;border-radius:10px;background:rgba(15,23,42,.94);color:#fff;font-size:.72rem;font-weight:750;box-shadow:0 8px 22px rgba(0,0,0,.18);display:none;">
+  </div>
+
   <script>
     (() => {
       const warning = document.querySelector('[data-duplicate-warning="1"]');
@@ -81,6 +90,171 @@
       // Alguns navegadores só liberam áudio após interação do usuário.
       playDuplicateWarning();
       document.addEventListener('click', playDuplicateWarning, { once: true });
+    })();
+  </script>
+
+  <script>
+    (() => {
+      const voiceBtn = document.getElementById('globalVoiceBtn');
+      const voiceStatus = document.getElementById('globalVoiceStatus');
+      const path = window.location.pathname.replace(/\/+$/, '') || '/';
+      let globalVoiceUnlocked = false;
+      let globalVoiceAttempted = false;
+      let globalSpeaking = false;
+
+      function showVoiceStatus(text) {
+        if (!voiceStatus) return;
+        voiceStatus.textContent = text;
+        voiceStatus.style.display = 'block';
+        window.clearTimeout(showVoiceStatus._timer);
+        showVoiceStatus._timer = window.setTimeout(() => {
+          voiceStatus.style.display = 'none';
+        }, 4200);
+      }
+
+      function pageMessage() {
+        if (path === '/resultados') {
+          const rows = [...document.querySelectorAll('.result-row')].slice(0, 6);
+          const summary = rows.map(row => {
+            const name = row.querySelector('.result-head span')?.textContent?.trim() || '';
+            const pct = row.querySelector('.result-head strong')?.textContent?.trim() || '';
+            const votes = row.querySelector('small')?.textContent?.trim() || '';
+            return [name, pct, votes].filter(Boolean).join(', ');
+          }).filter(Boolean).join('. ');
+
+          return 'Reis Tech e Software informa. Você está nos resultados da simulação. ' +
+            (summary || 'Ainda não há votos registrados.');
+        }
+
+        if (path === '/admin/login') {
+          return 'Reis Tech e Software. Você está na área de acesso administrativo. Digite sua senha para entrar no painel.';
+        }
+
+        if (path === '/admin') {
+          return 'Reis Tech e Software. Você está no painel administrativo da pesquisa. Aqui é possível gerenciar a pesquisa, candidatos e votos de teste.';
+        }
+
+        if (path === '/health') {
+          return 'Reis Tech e Software. O serviço está ativo.';
+        }
+
+        const heading = document.querySelector('h1')?.textContent?.trim();
+        return 'Reis Tech e Software. ' + (heading ? 'Você está na página ' + heading + '.' : 'Página carregada com sucesso.');
+      }
+
+      function choosePtVoice() {
+        const voices = window.speechSynthesis?.getVoices ? window.speechSynthesis.getVoices() : [];
+        return voices.find(v => /^pt-BR$/i.test(v.lang || ''))
+          || voices.find(v => /^pt/i.test(v.lang || ''))
+          || null;
+      }
+
+      function speakGeneric(force) {
+        if (!('speechSynthesis' in window)) {
+          showVoiceStatus('Este navegador não oferece voz do sistema.');
+          return;
+        }
+
+        if (!force && globalSpeaking) return;
+
+        const text = pageMessage();
+        try {
+          if (force) window.speechSynthesis.cancel();
+          else if (window.speechSynthesis.speaking || window.speechSynthesis.pending) return;
+
+          window.speechSynthesis.resume();
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.lang = 'pt-BR';
+          utterance.rate = 0.94;
+          utterance.pitch = 1;
+          utterance.volume = 1;
+
+          const voice = choosePtVoice();
+          if (voice) utterance.voice = voice;
+
+          utterance.onstart = () => {
+            globalSpeaking = true;
+            globalVoiceUnlocked = true;
+            showVoiceStatus('🔊 Reis Tech falando nesta página');
+          };
+          utterance.onend = () => {
+            globalSpeaking = false;
+          };
+          utterance.onerror = () => {
+            globalSpeaking = false;
+            showVoiceStatus('Toque em “Ouvir página” para liberar o áudio.');
+          };
+
+          window.speechSynthesis.speak(utterance);
+        } catch (error) {
+          showVoiceStatus('Toque em “Ouvir página” para liberar o áudio.');
+        }
+      }
+
+      function speakCurrentPage(force) {
+        // A urna e a apuração real já têm robôs próprios. O botão global
+        // aciona esses narradores em vez de criar uma segunda voz concorrente.
+        if (path === '/' && typeof window.falarInstrucao === 'function') {
+          window.falarInstrucao();
+          showVoiceStatus('🔊 Assistente da urna falando');
+          return;
+        }
+
+        if (path === '/apuracao-real') {
+          const officialButton = document.getElementById('robotSpeakNow');
+          if (officialButton) {
+            officialButton.click();
+            showVoiceStatus('🔊 Robô da apuração falando');
+            return;
+          }
+        }
+
+        speakGeneric(Boolean(force));
+      }
+
+      if (voiceBtn) {
+        voiceBtn.addEventListener('click', event => {
+          event.preventDefault();
+          event.stopPropagation();
+          globalVoiceUnlocked = true;
+          speakCurrentPage(true);
+        });
+      }
+
+      // Nas páginas que não possuem narrador próprio, tenta falar ao abrir.
+      // Se o Android bloquear autoplay, o primeiro toque/rolagem libera.
+      const hasDedicatedVoice = path === '/' || path === '/apuracao-real';
+
+      if (!hasDedicatedVoice) {
+        window.addEventListener('load', () => {
+          window.setTimeout(() => {
+            globalVoiceAttempted = true;
+            speakGeneric(false);
+          }, 650);
+        });
+
+        document.addEventListener('pointerdown', event => {
+          if (event.target && event.target.closest && event.target.closest('#globalVoiceBtn')) return;
+          if (globalVoiceUnlocked) return;
+          globalVoiceUnlocked = true;
+          speakGeneric(true);
+        }, { once: true, passive: true });
+
+        document.addEventListener('keydown', () => {
+          if (globalVoiceUnlocked) return;
+          globalVoiceUnlocked = true;
+          speakGeneric(true);
+        }, { once: true });
+      }
+
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && globalVoiceUnlocked && !hasDedicatedVoice && 'speechSynthesis' in window) {
+          try { window.speechSynthesis.resume(); } catch (error) {}
+        }
+      });
+
+      // Permite que outras telas chamem a voz global sem duplicar código.
+      window.reisSpeakCurrentPage = speakCurrentPage;
     })();
   </script>
 </body>
