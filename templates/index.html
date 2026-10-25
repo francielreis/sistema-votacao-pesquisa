@@ -1,9 +1,9 @@
 {% extends 'base.html' %}
 {% block content %}
 <section class="hero urna-hero">
-  <span class="eyebrow">SIMULADOR DE URNA — PESQUISA</span>
+  <span class="eyebrow">SIMULADOR DE PESQUISA</span>
   <h1>{{ poll.title }}</h1>
-  <p>Digite o número da opção desejada e pressione <strong>CONFIRMA</strong>. Este ambiente é apenas uma simulação de pesquisa.</p>
+  <p>Digite o número no teclado da urna e pressione <strong>CONFIRMA</strong>. Ambiente demonstrativo, sem vínculo com eleição oficial.</p>
 </section>
 
 {% if already_voted %}
@@ -12,60 +12,70 @@
 
 <section class="urna-wrap" aria-label="Simulador de urna eletrônica para pesquisa">
   <div class="urna-machine">
-    <div class="urna-screen-panel">
-      <div class="urna-screen" id="urnaScreen">
-        <div class="urna-screen-top">
-          <span>SEU VOTO PARA</span>
-          <strong>PESQUISA SIMULADA</strong>
-        </div>
+    <div class="urna-top-strip">
+      <span>TERMINAL DE VOTAÇÃO SIMULADA</span>
+      <strong>PESQUISAVOTO</strong>
+    </div>
 
-        <div class="urna-input-row">
-          <span>NÚMERO:</span>
-          <div class="urna-digits" id="urnaDigits" aria-live="polite"></div>
-        </div>
-
-        <div class="urna-candidate" id="candidatePreview">
-          <div class="urna-photo-placeholder" id="candidatePhoto">
-            <span>?</span>
+    <div class="urna-body">
+      <div class="urna-screen-panel">
+        <div class="urna-screen" id="urnaScreen">
+          <div class="urna-screen-top">
+            <span>SEU VOTO PARA</span>
+            <strong>{{ poll.title }}</strong>
           </div>
-          <div class="urna-candidate-data">
-            <small>OPÇÃO</small>
-            <h2 id="candidateName">Digite o número</h2>
-            <p id="candidateNumber">Use o teclado ao lado</p>
+
+          <div class="urna-input-row">
+            <span>Número:</span>
+            <div class="urna-digits" id="urnaDigits" aria-live="polite"></div>
+          </div>
+
+          <div class="urna-candidate" id="candidatePreview">
+            <div class="urna-candidate-data">
+              <small>CANDIDATO / OPÇÃO</small>
+              <h2 id="candidateName">Digite o número</h2>
+              <p id="candidateNumber">Use o teclado ao lado</p>
+            </div>
+
+            <div class="urna-photo-placeholder" id="candidatePhoto">
+              <span>?</span>
+            </div>
+          </div>
+
+          <div class="urna-screen-message" id="urnaMessage">
+            Confira os dados antes de confirmar.
+          </div>
+
+          <div class="urna-screen-footer">
+            <strong>SIMULAÇÃO DE PESQUISA — NÃO É UMA ELEIÇÃO OFICIAL</strong>
           </div>
         </div>
+      </div>
 
-        <div class="urna-screen-message" id="urnaMessage">
-          Confira os dados antes de confirmar.
+      <div class="urna-keyboard-panel">
+        <div class="urna-keyboard-title">
+          <strong>PESQUISAVOTO</strong>
+          <span>SIMULADOR</span>
         </div>
 
-        <div class="urna-screen-footer">
-          <strong>SIMULAÇÃO — NÃO É ELEIÇÃO OFICIAL</strong>
+        <div class="urna-keypad" id="urnaKeypad">
+          {% for n in range(1, 10) %}
+          <button type="button" class="urna-key" data-digit="{{ n }}" {% if already_voted %}disabled{% endif %}>{{ n }}</button>
+          {% endfor %}
+          <span class="urna-key-spacer"></span>
+          <button type="button" class="urna-key" data-digit="0" {% if already_voted %}disabled{% endif %}>0</button>
+          <span class="urna-key-spacer"></span>
+        </div>
+
+        <div class="urna-actions">
+          <button type="button" class="urna-action blank" id="blankBtn" {% if already_voted %}disabled{% endif %}>BRANCO</button>
+          <button type="button" class="urna-action correct" id="correctBtn" {% if already_voted %}disabled{% endif %}>CORRIGE</button>
+          <button type="button" class="urna-action confirm" id="confirmBtn" {% if already_voted %}disabled{% endif %}>CONFIRMA</button>
         </div>
       </div>
     </div>
 
-    <div class="urna-keyboard-panel">
-      <div class="urna-branding">
-        <strong>PESQUISAVOTO</strong>
-        <span>Terminal de simulação</span>
-      </div>
-
-      <div class="urna-keypad" id="urnaKeypad">
-        {% for n in range(1, 10) %}
-        <button type="button" class="urna-key" data-digit="{{ n }}" {% if already_voted %}disabled{% endif %}>{{ n }}</button>
-        {% endfor %}
-        <span></span>
-        <button type="button" class="urna-key" data-digit="0" {% if already_voted %}disabled{% endif %}>0</button>
-        <span></span>
-      </div>
-
-      <div class="urna-actions">
-        <button type="button" class="urna-action blank" id="blankBtn" {% if already_voted %}disabled{% endif %}>BRANCO</button>
-        <button type="button" class="urna-action correct" id="correctBtn" {% if already_voted %}disabled{% endif %}>CORRIGE</button>
-        <button type="button" class="urna-action confirm" id="confirmBtn" {% if already_voted %}disabled{% endif %}>CONFIRMA</button>
-      </div>
-    </div>
+    <div class="urna-bottom-label">SIMULADOR EDUCACIONAL / PESQUISA</div>
   </div>
 </section>
 
@@ -169,7 +179,7 @@
         photoEl.style.backgroundImage = '';
         photoEl.innerHTML = '<span>' + candidate.name.charAt(0).toUpperCase() + '</span>';
       }
-      messageEl.innerHTML = '<strong>CONFIRA:</strong> se os dados estiverem corretos, pressione CONFIRMA.';
+      messageEl.innerHTML = '<strong>CONFIRA OS DADOS</strong><br>Se estiver correto, pressione CONFIRMA.';
       confirmBtn.classList.add('ready');
     } else {
       nameEl.textContent = typed.length >= maxDigits ? 'Número não encontrado' : 'Digitando...';
