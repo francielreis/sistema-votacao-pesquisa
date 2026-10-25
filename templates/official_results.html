@@ -675,9 +675,10 @@
     'Sul': '#be123c'
   };
   const candidateColors = ['#2563eb', '#16a34a', '#7c3aed', '#ea580c'];
+  const INITIAL_OFFICIAL_DATA = {% if official_data %}{{ official_data|tojson }}{% else %}null{% endif %};
   let regionData = null;
   let selectedRegion = 'Nordeste';
-  let latestOfficialData = null;
+  let latestOfficialData = INITIAL_OFFICIAL_DATA;
   let robotVoiceEnabled = true;
   let robotVoiceUnlocked = false;
   let robotAutoAttempted = false;
@@ -1166,6 +1167,10 @@
   document.addEventListener('keydown', unlockRobotVoiceFromAnyInteraction);
 
   updateRobotVoiceUI();
+
+  if (latestOfficialData) {
+    updateRobotBubble(latestOfficialData);
+  }
 
   // Tenta a saudação imediatamente. Em navegadores móveis, o áudio pode ser
   // bloqueado até a primeira interação; nesse caso, o primeiro toque na tela
