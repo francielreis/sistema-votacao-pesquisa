@@ -6,6 +6,22 @@
   <p>Digite o número no teclado da urna e pressione <strong>CONFIRMA</strong>. Ambiente demonstrativo, sem vínculo com eleição oficial.</p>
 </section>
 
+<section class="reis-assistant" aria-label="Assistente virtual Reis Tech">
+  <div class="reis-assistant-robot" aria-hidden="true">
+    <span class="reis-assistant-pulse"></span>
+    <span class="reis-assistant-face">🤖</span>
+  </div>
+  <div class="reis-assistant-content">
+    <div class="reis-assistant-label">ASSISTENTE VIRTUAL • REIS TECH SOFTWARE</div>
+    <h2>Olá! Posso ajudar você a votar.</h2>
+    <p id="assistenteTexto">Aperte nas teclas da urna, escolha sua opção e contribua com nossa pesquisa.</p>
+    <div class="reis-assistant-actions">
+      <button type="button" class="assistant-speak-btn" id="assistantSpeakBtn">🔊 Ouvir instruções</button>
+      <button type="button" class="assistant-start-btn" id="assistantStartBtn">Começar votação ↓</button>
+    </div>
+  </div>
+</section>
+
 {% if admin_test_mode %}
 <div class="alert success"><strong>MODO TESTE ADMIN ATIVO:</strong> você está logado como administrador e pode registrar vários votos seguidos para testar a urna. Esses votos entram na apuração e podem ser apagados em “Zerar votos”.</div>
 {% elif already_voted %}
@@ -156,6 +172,52 @@
   let typed = '';
   let mode = 'number';
   let confirming = false;
+  let lastGuideText = '';
+
+  const assistantText = document.getElementById('assistenteTexto');
+  const assistantSpeakBtn = document.getElementById('assistantSpeakBtn');
+  const assistantStartBtn = document.getElementById('assistantStartBtn');
+
+  function setGuide(text) {
+    if (assistantText) assistantText.textContent = text;
+  }
+
+  function speakGuide(text, force = false) {
+    setGuide(text);
+    if (!force && lastGuideText === text) return;
+    lastGuideText = text;
+
+    try {
+      if (!('speechSynthesis' in window)) return;
+      window.speechSynthesis.cancel();
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'pt-BR';
+      utterance.rate = 0.96;
+      utterance.pitch = 1;
+      utterance.volume = 1;
+
+      const voices = window.speechSynthesis.getVoices();
+      const ptVoice = voices.find(v => (v.lang || '').toLowerCase().startsWith('pt-br'))
+        || voices.find(v => (v.lang || '').toLowerCase().startsWith('pt'));
+      if (ptVoice) utterance.voice = ptVoice;
+
+      window.speechSynthesis.speak(utterance);
+    } catch (error) {}
+  }
+
+  const welcomeGuide = 'Olá! Aperte nas teclas da urna, escolha sua opção e contribua com nossa pesquisa. Tecnologia Reis Tech Software.';
+
+  window.falarInstrucao = () => speakGuide(welcomeGuide, true);
+
+  assistantSpeakBtn?.addEventListener('click', () => {
+    speakGuide(welcomeGuide, true);
+  });
+
+  assistantStartBtn?.addEventListener('click', () => {
+    document.querySelector('.urna-machine')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    speakGuide('Digite os dois números da sua opção no teclado da urna.', true);
+  });
 
   function playKeySound(frequency = 720, duration = 0.055, volume = 0.08) {
     try {
@@ -252,6 +314,7 @@
       photoEl.innerHTML = '<span>B</span>';
       messageEl.innerHTML = '<strong>VOTO EM BRANCO</strong><br>Pressione CONFIRMA para registrar.';
       confirmBtn.classList.add('ready');
+      setGuide('Voto em branco selecionado. Se estiver correto, pressione CONFIRMA.');
       return;
     }
 
@@ -262,6 +325,7 @@
       photoEl.style.backgroundImage = '';
       messageEl.textContent = 'Confira os dados antes de confirmar.';
       confirmBtn.classList.remove('ready');
+      setGuide('Aperte nas teclas da urna, escolha sua opção e contribua com nossa pesquisa.');
       return;
     }
 
@@ -277,6 +341,7 @@
       }
       messageEl.innerHTML = '<strong>CONFIRA OS DADOS</strong><br>Se estiver correto, pressione CONFIRMA.';
       confirmBtn.classList.add('ready');
+      setGuide('Opção encontrada. Confira os dados e, se estiver correto, pressione CONFIRMA.');
     } else {
       const isNull = typed.length >= maxDigits;
       nameEl.textContent = isNull ? 'VOTO NULO' : 'Digitando...';
@@ -287,6 +352,9 @@
         ? '<strong>VOTO NULO</strong><br>Número não corresponde a 13 ou 22. Pressione CONFIRMA para registrar.'
         : 'Continue digitando o número.';
       confirmBtn.classList.toggle('ready', isNull);
+      setGuide(isNull
+        ? 'Esse número corresponde a voto nulo. Se quiser registrar, pressione CONFIRMA.'
+        : 'Digite o segundo número da sua opção.');
     }
   }
 
@@ -302,6 +370,17 @@
       mode = 'number';
       typed += btn.dataset.digit;
       update();
+
+      if (typed.length === 1) {
+        speakGuide('Agora digite o segundo número.');
+      } else {
+        const candidate = currentCandidate();
+        if (candidate) {
+          speakGuide('Opção encontrada. Confira os dados e pressione confirma.');
+        } else {
+          speakGuide('Esse número corresponde a voto nulo. Se quiser registrar, pressione confirma.');
+        }
+      }
     });
   });
 
@@ -310,6 +389,7 @@
     typed = '';
     mode = 'number';
     update();
+    speakGuide('Corrigido. Digite novamente os dois números da sua opção.');
   });
 
   blankBtn?.addEventListener('click', () => {
@@ -317,6 +397,7 @@
     typed = '';
     mode = 'blank';
     update();
+    speakGuide('Voto em branco selecionado. Se estiver correto, pressione confirma.');
   });
 
   confirmBtn?.addEventListener('click', () => {
@@ -340,6 +421,7 @@
     }
 
     messageEl.textContent = 'Digite os dois números antes de confirmar.';
+    speakGuide('Digite os dois números antes de confirmar.');
   });
 
   document.addEventListener('keydown', event => {
@@ -358,6 +440,17 @@
   });
 
   update();
+
+  // Alguns navegadores móveis bloqueiam voz automática até o primeiro toque.
+  window.addEventListener('load', () => {
+    window.setTimeout(() => speakGuide(welcomeGuide, true), 700);
+  });
+
+  document.addEventListener('pointerdown', () => {
+    if (!window.speechSynthesis?.speaking) {
+      speakGuide(welcomeGuide, true);
+    }
+  }, { once: true });
 })();
 </script>
 {% endblock %}
