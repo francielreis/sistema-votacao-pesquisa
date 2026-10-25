@@ -608,7 +608,9 @@
   let regionData = null;
   let selectedRegion = 'Nordeste';
   let latestOfficialData = null;
-  let robotVoiceEnabled = false;
+  let robotVoiceEnabled = true;
+  let robotVoiceUnlocked = false;
+  let robotAutoAttempted = false;
   let lastSpokenSignature = '';
 
   const els = {
@@ -943,12 +945,41 @@
     utterance.rate = 0.93;
     utterance.pitch = 1;
     utterance.volume = 1;
-    utterance.onstart = function() { setRobotSpeaking(true); };
-    utterance.onend = function() { setRobotSpeaking(false); };
-    utterance.onerror = function() { setRobotSpeaking(false); };
+
+    let started = false;
+    utterance.onstart = function() {
+      started = true;
+      robotVoiceUnlocked = true;
+      setRobotSpeaking(true);
+      if (els.robotVoiceStatus) {
+        els.robotVoiceStatus.textContent = 'Voz automática ligada — acompanhando a apuração';
+        els.robotVoiceStatus.classList.add('active');
+      }
+    };
+    utterance.onend = function() {
+      setRobotSpeaking(false);
+      if (started) lastSpokenSignature = signature;
+    };
+    utterance.onerror = function(event) {
+      setRobotSpeaking(false);
+      if (els.robotVoiceStatus) {
+        els.robotVoiceStatus.textContent =
+          'O navegador bloqueou o áudio automático. Toque em qualquer lugar da página para liberar a voz.';
+        els.robotVoiceStatus.classList.remove('active');
+      }
+    };
 
     window.speechSynthesis.speak(utterance);
-    lastSpokenSignature = signature;
+
+    window.setTimeout(function() {
+      if (!started && !window.speechSynthesis.speaking) {
+        if (els.robotVoiceStatus) {
+          els.robotVoiceStatus.textContent =
+            'Se o navegador bloquear o áudio, toque uma vez em qualquer lugar da página.';
+          els.robotVoiceStatus.classList.remove('active');
+        }
+      }
+    }, 1200);
   }
 
   function updateRobotVoiceUI() {
@@ -957,7 +988,7 @@
     }
     if (els.robotVoiceStatus) {
       els.robotVoiceStatus.textContent = robotVoiceEnabled
-        ? 'Voz automática ligada — o robô fala quando os dados mudarem'
+        ? 'Voz automática ligada — o robô tentará falar ao abrir e quando os dados mudarem'
         : 'Voz automática desligada';
       els.robotVoiceStatus.classList.toggle('active', robotVoiceEnabled);
     }
@@ -966,9 +997,13 @@
   if (els.robotVoiceToggle) {
     els.robotVoiceToggle.addEventListener('click', function() {
       robotVoiceEnabled = !robotVoiceEnabled;
+      try {
+        localStorage.setItem('reisRobotVoice', robotVoiceEnabled ? 'on' : 'off');
+      } catch (error) {}
       updateRobotVoiceUI();
 
       if (robotVoiceEnabled && latestOfficialData) {
+        robotVoiceUnlocked = true;
         speakRobot(latestOfficialData, true);
       } else if (!robotVoiceEnabled && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel();
@@ -979,9 +1014,25 @@
 
   if (els.robotSpeakNow) {
     els.robotSpeakNow.addEventListener('click', function() {
+      robotVoiceUnlocked = true;
       if (latestOfficialData) speakRobot(latestOfficialData, true);
     });
   }
+
+  try {
+    const savedVoice = localStorage.getItem('reisRobotVoice');
+    if (savedVoice === 'off') robotVoiceEnabled = false;
+    if (savedVoice === 'on') robotVoiceEnabled = true;
+  } catch (error) {}
+
+  function unlockRobotVoiceFromAnyTap() {
+    if (!robotVoiceEnabled || robotVoiceUnlocked || !latestOfficialData) return;
+    robotVoiceUnlocked = true;
+    speakRobot(latestOfficialData, true);
+  }
+
+  document.addEventListener('pointerdown', unlockRobotVoiceFromAnyTap, { passive: true });
+  document.addEventListener('keydown', unlockRobotVoiceFromAnyTap);
 
   updateRobotVoiceUI();
 
@@ -1028,7 +1079,12 @@
       updateRobotBubble(data);
 
       if (robotVoiceEnabled) {
-        speakRobot(data, false);
+        if (!robotAutoAttempted) {
+          robotAutoAttempted = true;
+          speakRobot(data, true);
+        } else {
+          speakRobot(data, false);
+        }
       }
 
       if (Number(data.sections.counted || 0) === 0) {
