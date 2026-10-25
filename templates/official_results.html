@@ -525,10 +525,22 @@
     <div class="reis-robot-bubble">
       <div id="robotSpeechText">
         Olá! Eu sou o robô da <strong>Reis Tech e Software</strong>.<br>
-        Estou acompanhando <strong>dados oficiais em tempo real do TSE — Tribunal Superior Eleitoral</strong>.<br>
-        Carregando os percentuais dos candidatos…
+        Dados oficiais em tempo real do <strong>TSE — Tribunal Superior Eleitoral</strong>.<br>
+        {% if official_data and official_data.candidates %}
+          {% for candidate in official_data.candidates %}
+            <strong>{{ candidate.name }}</strong>{% if candidate.party %} — {{ candidate.party }}{% endif %}{% if candidate.number %} — nº {{ candidate.number }}{% endif %}: {{ '%.2f'|format(candidate.pct or 0)|replace('.', ',') }}%{% if candidate.votes is defined %} • {{ "{:,}".format(candidate.votes or 0).replace(",", ".") }} votos{% endif %}<br>
+          {% endfor %}
+        {% else %}
+          Aguardando os percentuais oficiais dos candidatos…
+        {% endif %}
       </div>
-      <small id="robotSpeechMeta">Os dados são atualizados automaticamente a cada 10 segundos.</small>
+      <small id="robotSpeechMeta">
+        {% if official_data %}
+          Seções totalizadas: {{ '%.2f'|format(official_data.sections.pct or 0)|replace('.', ',') }}%{% if official_data.generated_time %} • Último arquivo: {{ official_data.generated_time }}{% endif %} • Atualização automática a cada 10 segundos.
+        {% else %}
+          Os dados são atualizados automaticamente a cada 10 segundos.
+        {% endif %}
+      </small>
       <div class="robot-voice-controls">
         <button id="robotVoiceToggle" class="robot-voice-btn" type="button">🔇 Desativar voz</button>
         <button id="robotSpeakNow" class="robot-voice-btn" type="button">🔊 OUVIR ROBÔ AGORA</button>
@@ -990,8 +1002,11 @@
   function updateRobotBubble(data) {
     if (!els.robotSpeechText || !data) return;
     const rows = (data.candidates || []).map(function(candidate) {
-      return '<strong>' + (candidate.name || 'Candidato') + '</strong>: ' +
-        fmtPct(candidate.pct) + ' • ' + fmtInt(candidate.votes || 0) + ' votos';
+      const party = candidate.party ? ' — ' + candidate.party : '';
+      const number = candidate.number ? ' — nº ' + candidate.number : '';
+      return '<strong>' + (candidate.name || 'Candidato') + '</strong>' +
+        party + number + ': ' + fmtPct(candidate.pct) +
+        ' • ' + fmtInt(candidate.votes || 0) + ' votos';
     }).join('<br>');
 
     els.robotSpeechText.innerHTML =
