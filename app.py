@@ -1,9 +1,14 @@
 import os
 import hashlib
+import json
+import threading
+import time
 from datetime import datetime
 from functools import wraps
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import inspect, text
 
@@ -30,6 +35,144 @@ SPECIAL_CANDIDATES = {
     'branco': {'number': '__BRANCO__', 'name': 'Voto em Branco'},
     'nulo': {'number': '__NULO__', 'name': 'Voto Nulo'},
 }
+
+
+# Apuração oficial do 2º turno presidencial de 2026.
+# A URL pode ser sobrescrita no Render pela variável TSE_RESULT_URL sem alterar o código.
+TSE_RESULT_URL = os.getenv(
+    'TSE_RESULT_URL',
+    'https://resultados.tse.jus.br/oficial/ele2026/6258/dados/br/br-c0001-e006258-u.json'
+)
+TSE_CACHE_SECONDS = max(5, int(os.getenv('TSE_CACHE_SECONDS', '10')))
+TSE_TIMEOUT_SECONDS = max(3, int(os.getenv('TSE_TIMEOUT_SECONDS', '8')))
+
+_tse_cache = {
+    'data': None,
+    'fetched_at': 0.0,
+    'etag': None,
+    'last_modified': None,
+}
+_tse_lock = threading.Lock()
+
+
+def _safe_int(value):
+    try:
+        return int(str(value or '0').replace('.', '').strip())
+    except (TypeError, ValueError):
+        return 0
+
+
+def _safe_pct(value):
+    try:
+        return float(str(value or '0').replace(',', '.').strip())
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _normalize_tse_results(payload):
+    candidates = []
+
+    for office in payload.get('carg', []):
+        if str(office.get('cd')) != '1':
+            continue
+
+        for alliance in office.get('agr', []):
+            for party in alliance.get('par', []):
+                for candidate in party.get('cand', []):
+                    candidates.append({
+                        'number': str(candidate.get('n') or ''),
+                        'name': candidate.get('nmu') or candidate.get('nm') or 'Candidato',
+                        'full_name': candidate.get('nm') or '',
+                        'party': party.get('sg') or '',
+                        'votes': _safe_int(candidate.get('vap')),
+                        'pct': _safe_pct(candidate.get('pvap')),
+                        'status': candidate.get('st') or '',
+                        'elected': candidate.get('e') == 's',
+                    })
+
+    candidates.sort(key=lambda item: (-item['votes'], item['name']))
+
+    sections = payload.get('s') or {}
+    voters = payload.get('e') or {}
+    votes = payload.get('v') or {}
+
+    return {
+        'ok': True,
+        'source': 'Tribunal Superior Eleitoral (TSE)',
+        'source_url': TSE_RESULT_URL,
+        'election': str(payload.get('ele') or '6258'),
+        'round': str(payload.get('t') or '2'),
+        'generated_date': payload.get('dg') or payload.get('dt') or '',
+        'generated_time': payload.get('hg') or payload.get('ht') or '',
+        'sections': {
+            'total': _safe_int(sections.get('ts')),
+            'counted': _safe_int(sections.get('st')),
+            'pct': _safe_pct(sections.get('pst')),
+        },
+        'electorate': {
+            'total': _safe_int(voters.get('te')),
+            'counted': _safe_int(voters.get('est')),
+        },
+        'votes': {
+            'total': _safe_int(votes.get('tv')),
+            'valid': _safe_int(votes.get('vv')),
+            'blank': _safe_int(votes.get('vb')),
+            'null': _safe_int(votes.get('vn')),
+        },
+        'candidates': candidates,
+        'stale': False,
+    }
+
+
+def fetch_tse_results():
+    now = time.monotonic()
+
+    if _tse_cache['data'] and now - _tse_cache['fetched_at'] < TSE_CACHE_SECONDS:
+        return _tse_cache['data']
+
+    with _tse_lock:
+        now = time.monotonic()
+        if _tse_cache['data'] and now - _tse_cache['fetched_at'] < TSE_CACHE_SECONDS:
+            return _tse_cache['data']
+
+        headers = {
+            'Accept': 'application/json',
+            'User-Agent': 'ReisTech-Apuracao/1.0 (+https://resultados.tse.jus.br)'
+        }
+        if _tse_cache['etag']:
+            headers['If-None-Match'] = _tse_cache['etag']
+        if _tse_cache['last_modified']:
+            headers['If-Modified-Since'] = _tse_cache['last_modified']
+
+        request_tse = Request(TSE_RESULT_URL, headers=headers)
+
+        try:
+            with urlopen(request_tse, timeout=TSE_TIMEOUT_SECONDS) as response:
+                raw = response.read().decode('utf-8')
+                payload = json.loads(raw)
+                normalized = _normalize_tse_results(payload)
+                _tse_cache['data'] = normalized
+                _tse_cache['fetched_at'] = now
+                _tse_cache['etag'] = response.headers.get('ETag')
+                _tse_cache['last_modified'] = response.headers.get('Last-Modified')
+                return normalized
+        except HTTPError as exc:
+            if exc.code == 304 and _tse_cache['data']:
+                _tse_cache['fetched_at'] = now
+                return _tse_cache['data']
+            if _tse_cache['data']:
+                stale = dict(_tse_cache['data'])
+                stale['stale'] = True
+                stale['warning'] = 'O TSE não respondeu agora; exibindo a última atualização recebida.'
+                return stale
+            raise
+        except (URLError, TimeoutError, json.JSONDecodeError):
+            if _tse_cache['data']:
+                stale = dict(_tse_cache['data'])
+                stale['stale'] = True
+                stale['warning'] = 'O TSE não respondeu agora; exibindo a última atualização recebida.'
+                return stale
+            raise
 
 
 class Poll(db.Model):
@@ -218,6 +361,27 @@ def results():
         blank_pct=blank_pct,
         null_pct=null_pct,
     )
+
+
+@app.get('/apuracao-real')
+def official_results():
+    return render_template(
+        'official_results.html',
+        title='Apuração Oficial em Tempo Real',
+        official_page=True,
+    )
+
+
+@app.get('/api/apuracao-real')
+def official_results_api():
+    try:
+        data = fetch_tse_results()
+        return jsonify(data)
+    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError):
+        return jsonify({
+            'ok': False,
+            'error': 'Não foi possível consultar o TSE neste momento. Tente novamente em instantes.'
+        }), 503
 
 
 @app.route('/admin/login', methods=['GET', 'POST'])
