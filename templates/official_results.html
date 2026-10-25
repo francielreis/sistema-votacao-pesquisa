@@ -693,6 +693,7 @@
   let latestOfficialData = INITIAL_OFFICIAL_DATA;
   let robotVoiceEnabled = true;
   let robotVoiceUnlocked = false;
+  let robotScreenGestureHandled = false;
   let robotAutoAttempted = false;
   let robotUserGestureSeen = false;
   let robotPendingAfterGesture = false;
@@ -1246,9 +1247,9 @@
   }
 
   function unlockRobotVoiceFromAnyInteraction() {
-    if (!robotVoiceEnabled) return;
-    if (robotUserGestureSeen && robotVoiceUnlocked) return;
+    if (!robotVoiceEnabled || robotScreenGestureHandled) return;
 
+    robotScreenGestureHandled = true;
     robotUserGestureSeen = true;
     robotVoiceUnlocked = true;
 
@@ -1260,24 +1261,28 @@
       return;
     }
 
-    // Uma tentativa automática bloqueada pode ficar pendente no Chrome/Android.
-    // No primeiro gesto real do usuário, cancela essa fila e inicia uma fala nova
-    // dentro do próprio gesto, aumentando a compatibilidade com celulares.
+    // IMPORTANTE: a fala precisa ser disparada SINCRONAMENTE dentro do primeiro
+    // toque. Se usarmos setTimeout aqui, Chrome/Android pode perder a permissão
+    // temporária concedida pelo gesto e bloquear novamente o áudio.
+    robotSpeechRunId += 1;
+    robotCurrentSignature = '';
+    robotQueuedData = null;
+    robotPendingAfterGesture = !latestOfficialData;
+
     try {
       window.speechSynthesis.cancel();
       window.speechSynthesis.resume();
     } catch (error) {}
 
-    robotPendingAfterGesture = !latestOfficialData;
-
     if (els.robotVoiceStatus) {
       els.robotVoiceStatus.textContent = latestOfficialData
-        ? 'Voz liberada — iniciando locução agora'
-        : 'Voz liberada — aguardando os dados do TSE para iniciar a locução';
+        ? 'Voz liberada pelo toque — iniciando locução agora'
+        : 'Voz liberada pelo toque — aguardando os dados do TSE';
       els.robotVoiceStatus.classList.add('active');
     }
 
-    restartRobotSpeech(latestOfficialData || null);
+    // Sem atraso: chama speechSynthesis.speak() ainda dentro do mesmo gesto.
+    speakRobot(latestOfficialData || null, true);
   }
 
   function handleFirstRobotGesture(event) {
