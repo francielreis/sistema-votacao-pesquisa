@@ -697,6 +697,9 @@
   let robotUserGestureSeen = false;
   let robotPendingAfterGesture = false;
   let lastSpokenSignature = '';
+  let robotCurrentSignature = '';
+  let robotQueuedData = null;
+  let robotSpeechRunId = 0;
 
   const els = {
     status: document.getElementById('status'),
@@ -1028,60 +1031,147 @@
     els.reisRobot.classList.toggle('speaking', Boolean(active));
   }
 
-  function speakRobot(data, force) {
-    if (!('speechSynthesis' in window)) return;
-    const signature = robotSignature(data);
-    if (!force && signature === lastSpokenSignature) return;
+  function robotSpeechChunks(data) {
+    return robotSpeech(data)
+      .split(/(?<=[.!?])\s+/)
+      .map(function(part) { return part.trim(); })
+      .filter(Boolean);
+  }
 
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(robotSpeech(data));
-    utterance.lang = 'pt-BR';
-    utterance.rate = 0.93;
-    utterance.pitch = 1;
-    utterance.volume = 1;
-
-    const voices = window.speechSynthesis.getVoices ? window.speechSynthesis.getVoices() : [];
-    const ptVoice = voices.find(function(voice) {
+  function preferredRobotVoice() {
+    const voices = window.speechSynthesis && window.speechSynthesis.getVoices
+      ? window.speechSynthesis.getVoices()
+      : [];
+    return voices.find(function(voice) {
       return /^pt-BR$/i.test(voice.lang || '');
     }) || voices.find(function(voice) {
       return /^pt/i.test(voice.lang || '');
-    });
-    if (ptVoice) utterance.voice = ptVoice;
+    }) || null;
+  }
 
-    let started = false;
-    utterance.onstart = function() {
-      started = true;
-      robotVoiceUnlocked = true;
-      setRobotSpeaking(true);
-      if (els.robotVoiceStatus) {
-        els.robotVoiceStatus.textContent = 'Voz automática ligada — acompanhando a apuração';
-        els.robotVoiceStatus.classList.add('active');
-      }
-    };
-    utterance.onend = function() {
-      setRobotSpeaking(false);
-      if (started) lastSpokenSignature = signature;
-    };
-    utterance.onerror = function(event) {
-      setRobotSpeaking(false);
-      if (els.robotVoiceStatus) {
-        els.robotVoiceStatus.textContent =
-          'O navegador bloqueou o áudio automático. Toque em qualquer lugar da página para liberar a voz.';
-        els.robotVoiceStatus.classList.remove('active');
-      }
-    };
+  function finishRobotSpeech(signature, runId) {
+    if (runId !== robotSpeechRunId) return;
 
-    window.speechSynthesis.speak(utterance);
+    robotCurrentSignature = '';
+    setRobotSpeaking(false);
+    if (signature) lastSpokenSignature = signature;
+
+    const queued = robotQueuedData;
+    robotQueuedData = null;
+
+    if (queued && robotVoiceEnabled) {
+      const queuedSignature = robotSignature(queued);
+      if (queuedSignature && queuedSignature !== lastSpokenSignature) {
+        window.setTimeout(function() {
+          speakRobot(queued, false);
+        }, 250);
+      }
+    }
+  }
+
+  function speakRobot(data, force) {
+    if (!robotVoiceEnabled || !('speechSynthesis' in window)) return;
+
+    const signature = robotSignature(data);
+    if (!force && (signature === lastSpokenSignature || signature === robotCurrentSignature)) return;
+
+    // Nunca corta uma fala automática no meio. Se chegarem dados novos enquanto
+    // o robô está falando, guarda apenas a atualização mais recente e anuncia
+    // depois. Isso evita o cancelamento a cada 10 segundos no Chrome/Android.
+    if (robotCurrentSignature || window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+      robotQueuedData = data;
+      return;
+    }
+
+    const chunks = robotSpeechChunks(data);
+    if (!chunks.length) return;
+
+    const runId = ++robotSpeechRunId;
+    robotCurrentSignature = signature || '__intro__';
+    let index = 0;
+    let startedAny = false;
+
+    function speakNextChunk() {
+      if (runId !== robotSpeechRunId || !robotVoiceEnabled) return;
+
+      if (index >= chunks.length) {
+        finishRobotSpeech(signature, runId);
+        return;
+      }
+
+      const utterance = new SpeechSynthesisUtterance(chunks[index]);
+      utterance.lang = 'pt-BR';
+      utterance.rate = 0.93;
+      utterance.pitch = 1;
+      utterance.volume = 1;
+
+      const ptVoice = preferredRobotVoice();
+      if (ptVoice) utterance.voice = ptVoice;
+
+      utterance.onstart = function() {
+        startedAny = true;
+        robotVoiceUnlocked = true;
+        setRobotSpeaking(true);
+        if (els.robotVoiceStatus) {
+          els.robotVoiceStatus.textContent = 'Voz automática ligada — acompanhando a apuração';
+          els.robotVoiceStatus.classList.add('active');
+        }
+      };
+
+      utterance.onend = function() {
+        if (runId !== robotSpeechRunId) return;
+        index += 1;
+        window.setTimeout(speakNextChunk, 80);
+      };
+
+      utterance.onerror = function(event) {
+        if (runId !== robotSpeechRunId) return;
+
+        const reason = event && event.error ? String(event.error) : '';
+        if (reason === 'canceled' || reason === 'interrupted') return;
+
+        robotCurrentSignature = '';
+        setRobotSpeaking(false);
+        if (els.robotVoiceStatus) {
+          els.robotVoiceStatus.textContent =
+            'O navegador bloqueou o áudio automático. Toque uma vez na tela para liberar a voz.';
+          els.robotVoiceStatus.classList.remove('active');
+        }
+      };
+
+      try { window.speechSynthesis.resume(); } catch (error) {}
+      window.speechSynthesis.speak(utterance);
+    }
+
+    speakNextChunk();
 
     window.setTimeout(function() {
-      if (!started && !window.speechSynthesis.speaking) {
+      if (runId !== robotSpeechRunId) return;
+      if (!startedAny && !window.speechSynthesis.speaking) {
+        robotCurrentSignature = '';
         if (els.robotVoiceStatus) {
           els.robotVoiceStatus.textContent =
             'Se o navegador bloquear o áudio, toque uma vez em qualquer lugar da página.';
           els.robotVoiceStatus.classList.remove('active');
         }
       }
-    }, 1200);
+    }, 1400);
+  }
+
+  function restartRobotSpeech(data) {
+    if (!('speechSynthesis' in window)) return;
+
+    robotSpeechRunId += 1;
+    robotCurrentSignature = '';
+    robotQueuedData = null;
+    try {
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.resume();
+    } catch (error) {}
+
+    window.setTimeout(function() {
+      speakRobot(data, true);
+    }, 80);
   }
 
   function updateRobotVoiceUI() {
@@ -1105,9 +1195,11 @@
       if (robotVoiceEnabled) {
         robotUserGestureSeen = true;
         robotVoiceUnlocked = true;
-        if ('speechSynthesis' in window) window.speechSynthesis.resume();
-        speakRobot(latestOfficialData || null, true);
+        restartRobotSpeech(latestOfficialData || null);
       } else if (!robotVoiceEnabled && 'speechSynthesis' in window) {
+        robotSpeechRunId += 1;
+        robotCurrentSignature = '';
+        robotQueuedData = null;
         window.speechSynthesis.cancel();
         setRobotSpeaking(false);
       }
@@ -1135,19 +1227,14 @@
         return;
       }
 
-      try {
-        window.speechSynthesis.cancel();
-        window.speechSynthesis.resume();
-      } catch (error) {}
-
       if (els.robotVoiceStatus) {
         els.robotVoiceStatus.textContent = 'Falando agora…';
         els.robotVoiceStatus.classList.add('active');
       }
 
-      // Importante: fala executada diretamente dentro do clique do usuário.
-      // Isso evita o bloqueio de autoplay do Chrome/Android.
-      speakRobot(latestOfficialData || null, true);
+      // Reinicia somente quando o próprio usuário pede. As atualizações
+      // automáticas não interrompem mais a frase atual.
+      restartRobotSpeech(latestOfficialData || null);
     });
   }
 
@@ -1179,7 +1266,22 @@
     if (event.target && event.target.closest && event.target.closest('#robotVoiceToggle, #robotSpeakNow')) return;
     unlockRobotVoiceFromAnyInteraction();
   });
+  // pointerdown também dispara quando a pessoa toca e começa a rolar a tela.
+  // Assim o primeiro gesto no celular libera a voz mesmo sem virar um clique.
+  document.addEventListener('pointerdown', function(event) {
+    if (event.target && event.target.closest && event.target.closest('#robotVoiceToggle, #robotSpeakNow')) return;
+    unlockRobotVoiceFromAnyInteraction();
+  }, { passive: true });
   document.addEventListener('keydown', unlockRobotVoiceFromAnyInteraction);
+
+  document.addEventListener('visibilitychange', function() {
+    if (!document.hidden && robotVoiceEnabled && robotUserGestureSeen && 'speechSynthesis' in window) {
+      try { window.speechSynthesis.resume(); } catch (error) {}
+      if (!robotCurrentSignature && latestOfficialData) {
+        speakRobot(latestOfficialData, false);
+      }
+    }
+  });
 
   updateRobotVoiceUI();
 
@@ -1238,7 +1340,7 @@
       updateRobotBubble(data);
 
       if (robotVoiceEnabled) {
-        if (robotPendingAfterGesture || robotUserGestureSeen) {
+        if (robotPendingAfterGesture) {
           robotPendingAfterGesture = false;
           robotVoiceUnlocked = true;
           if ('speechSynthesis' in window) {
@@ -1249,6 +1351,8 @@
           robotAutoAttempted = true;
           speakRobot(data, true);
         } else {
+          // Se os dados mudarem durante uma fala, speakRobot guarda a atualização
+          // mais recente e só anuncia depois, sem cortar a frase atual.
           speakRobot(data, false);
         }
       }
