@@ -9,7 +9,11 @@
 {% if admin_test_mode %}
 <div class="alert success"><strong>MODO TESTE ADMIN ATIVO:</strong> você está logado como administrador e pode registrar vários votos seguidos para testar a urna. Esses votos entram na apuração e podem ser apagados em “Zerar votos”.</div>
 {% elif already_voted %}
-<div class="alert warning">Este navegador já registrou um voto nesta pesquisa. <a href="{{ url_for('results') }}">Ver resultados</a>.</div>
+<div class="alert warning duplicate-warning" data-duplicate-warning="1">
+  <strong>Só é permitida uma simulação por pessoa neste navegador.</strong><br>
+  Reis Tech Software • Desenvolvedor: Franciel Reis<br>
+  <a href="{{ url_for('results') }}">Ver resultados</a>
+</div>
 {% endif %}
 
 <section class="urna-wrap" aria-label="Simulador de urna eletrônica para pesquisa">
