@@ -116,6 +116,9 @@
   </div>
 </section>
 
+<form method="post" action="{{ url_for('vote_special', kind='branco') }}" id="blankVoteForm" hidden></form>
+<form method="post" action="{{ url_for('vote_special', kind='nulo') }}" id="nullVoteForm" hidden></form>
+
 <script>
 (() => {
   const optionCards = [...document.querySelectorAll('.urna-option-card')];
@@ -143,8 +146,9 @@
 
   if (!digitsEl) return;
 
-  const maxDigits = Math.max(2, ...candidates.map(c => c.number.length));
+  const maxDigits = 2;
   let typed = '';
+  let mode = 'number';
 
   function renderDigits() {
     digitsEl.innerHTML = '';
@@ -162,6 +166,16 @@
 
   function renderCandidate() {
     const candidate = currentCandidate();
+
+    if (mode === 'blank') {
+      nameEl.textContent = 'VOTO EM BRANCO';
+      numberEl.textContent = 'Sem número';
+      photoEl.style.backgroundImage = '';
+      photoEl.innerHTML = '<span>B</span>';
+      messageEl.innerHTML = '<strong>VOTO EM BRANCO</strong><br>Pressione CONFIRMA para registrar.';
+      confirmBtn.classList.add('ready');
+      return;
+    }
 
     if (!typed) {
       nameEl.textContent = 'Digite o número';
@@ -186,12 +200,15 @@
       messageEl.innerHTML = '<strong>CONFIRA OS DADOS</strong><br>Se estiver correto, pressione CONFIRMA.';
       confirmBtn.classList.add('ready');
     } else {
-      nameEl.textContent = typed.length >= maxDigits ? 'Número não encontrado' : 'Digitando...';
+      const isNull = typed.length >= maxDigits;
+      nameEl.textContent = isNull ? 'VOTO NULO' : 'Digitando...';
       numberEl.textContent = typed;
-      photoEl.innerHTML = '<span>?</span>';
       photoEl.style.backgroundImage = '';
-      messageEl.textContent = typed.length >= maxDigits ? 'Pressione CORRIGE e tente novamente.' : 'Continue digitando o número.';
-      confirmBtn.classList.remove('ready');
+      photoEl.innerHTML = isNull ? '<span>N</span>' : '<span>?</span>';
+      messageEl.innerHTML = isNull
+        ? '<strong>VOTO NULO</strong><br>Número não corresponde a 13 ou 22. Pressione CONFIRMA para registrar.'
+        : 'Continue digitando o número.';
+      confirmBtn.classList.toggle('ready', isNull);
     }
   }
 
@@ -203,6 +220,7 @@
   document.querySelectorAll('.urna-key[data-digit]').forEach(btn => {
     btn.addEventListener('click', () => {
       if (typed.length >= maxDigits) return;
+      mode = 'number';
       typed += btn.dataset.digit;
       update();
     });
@@ -210,31 +228,45 @@
 
   correctBtn?.addEventListener('click', () => {
     typed = '';
+    mode = 'number';
     update();
   });
 
   blankBtn?.addEventListener('click', () => {
     typed = '';
+    mode = 'blank';
     update();
-    messageEl.textContent = 'Voto em branco não está habilitado nesta pesquisa simulada.';
   });
 
   confirmBtn?.addEventListener('click', () => {
-    const candidate = currentCandidate();
-    if (!candidate) {
-      messageEl.textContent = 'Digite um número válido antes de confirmar.';
+    if (mode === 'blank') {
+      document.getElementById('blankVoteForm')?.submit();
       return;
     }
-    const form = document.getElementById('voteForm' + candidate.id);
-    if (form) form.submit();
+
+    const candidate = currentCandidate();
+    if (candidate) {
+      const form = document.getElementById('voteForm' + candidate.id);
+      if (form) form.submit();
+      return;
+    }
+
+    if (typed.length >= maxDigits) {
+      document.getElementById('nullVoteForm')?.submit();
+      return;
+    }
+
+    messageEl.textContent = 'Digite os dois números antes de confirmar.';
   });
 
   document.addEventListener('keydown', event => {
     if (/^[0-9]$/.test(event.key) && typed.length < maxDigits) {
+      mode = 'number';
       typed += event.key;
       update();
     } else if (event.key === 'Backspace' || event.key === 'Escape') {
       typed = '';
+      mode = 'number';
       update();
     } else if (event.key === 'Enter') {
       confirmBtn?.click();
