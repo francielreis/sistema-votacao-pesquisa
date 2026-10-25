@@ -3,6 +3,7 @@ import hashlib
 import json
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from functools import wraps
 from urllib.error import HTTPError, URLError
@@ -177,6 +178,151 @@ def fetch_tse_results():
                 stale['warning'] = 'O TSE não respondeu agora; exibindo a última atualização recebida.'
                 return stale
             raise
+
+
+# Agregação por Grandes Regiões do Brasil (IBGE).
+REGION_STATES = {
+    'Norte': ['ac', 'ap', 'am', 'pa', 'ro', 'rr', 'to'],
+    'Nordeste': ['al', 'ba', 'ce', 'ma', 'pb', 'pe', 'pi', 'rn', 'se'],
+    'Centro-Oeste': ['df', 'go', 'mt', 'ms'],
+    'Sudeste': ['es', 'mg', 'rj', 'sp'],
+    'Sul': ['pr', 'rs', 'sc'],
+}
+TSE_REGION_CACHE_SECONDS = max(20, int(os.getenv('TSE_REGION_CACHE_SECONDS', '30')))
+_region_cache = {'data': None, 'fetched_at': 0.0}
+_region_lock = threading.Lock()
+
+
+def _state_result_url(uf):
+    return (
+        'https://resultados.tse.jus.br/oficial/ele2026/6258/dados/'
+        f'{uf}/{uf}-c0001-e006258-u.json'
+    )
+
+
+def _fetch_json_url(url):
+    req = Request(url, headers={
+        'Accept': 'application/json',
+        'User-Agent': 'ReisTech-Apuracao/1.0 (+https://resultados.tse.jus.br)'
+    })
+    with urlopen(req, timeout=TSE_TIMEOUT_SECONDS) as response:
+        return json.loads(response.read().decode('utf-8'))
+
+
+def _fetch_state_official_results(uf):
+    payload = _fetch_json_url(_state_result_url(uf))
+    return uf, _normalize_tse_results(payload)
+
+
+def fetch_region_results():
+    now = time.monotonic()
+    if _region_cache['data'] and now - _region_cache['fetched_at'] < TSE_REGION_CACHE_SECONDS:
+        return _region_cache['data']
+
+    with _region_lock:
+        now = time.monotonic()
+        if _region_cache['data'] and now - _region_cache['fetched_at'] < TSE_REGION_CACHE_SECONDS:
+            return _region_cache['data']
+
+        uf_to_region = {
+            uf: region
+            for region, states in REGION_STATES.items()
+            for uf in states
+        }
+        state_results = {}
+        errors = []
+
+        with ThreadPoolExecutor(max_workers=6) as executor:
+            futures = {
+                executor.submit(_fetch_state_official_results, uf): uf
+                for uf in uf_to_region
+            }
+            for future in as_completed(futures):
+                uf = futures[future]
+                try:
+                    state_results[uf] = future.result()[1]
+                except Exception:
+                    errors.append(uf)
+
+        if errors:
+            if _region_cache['data']:
+                stale = dict(_region_cache['data'])
+                stale['stale'] = True
+                stale['warning'] = (
+                    'Alguns arquivos estaduais do TSE não responderam; '
+                    'exibindo a última consolidação regional completa.'
+                )
+                return stale
+            raise RuntimeError('Falha ao consultar UFs: ' + ', '.join(sorted(errors)))
+
+        regions = []
+        for region_name, states in REGION_STATES.items():
+            candidate_totals = {}
+            total_sections = 0
+            counted_sections = 0
+            electorate = 0
+            blank_votes = 0
+            null_votes = 0
+
+            for uf in states:
+                state = state_results[uf]
+                total_sections += state['sections']['total']
+                counted_sections += state['sections']['counted']
+                electorate += state['electorate']['total']
+                blank_votes += state['votes']['blank']
+                null_votes += state['votes']['null']
+
+                for candidate in state['candidates']:
+                    number = candidate['number']
+                    if number not in candidate_totals:
+                        candidate_totals[number] = {
+                            'number': number,
+                            'name': candidate['name'],
+                            'party': candidate['party'],
+                            'votes': 0,
+                        }
+                    candidate_totals[number]['votes'] += candidate['votes']
+
+            candidates = list(candidate_totals.values())
+            valid_votes = sum(candidate['votes'] for candidate in candidates)
+            for candidate in candidates:
+                candidate['pct'] = (
+                    candidate['votes'] / valid_votes * 100
+                    if valid_votes else 0.0
+                )
+            candidates.sort(key=lambda item: (-item['votes'], item['number']))
+
+            regions.append({
+                'name': region_name,
+                'states': [uf.upper() for uf in states],
+                'sections': {
+                    'total': total_sections,
+                    'counted': counted_sections,
+                    'pct': (
+                        counted_sections / total_sections * 100
+                        if total_sections else 0.0
+                    ),
+                },
+                'electorate': electorate,
+                'votes': {
+                    'valid': valid_votes,
+                    'blank': blank_votes,
+                    'null': null_votes,
+                    'total': valid_votes + blank_votes + null_votes,
+                },
+                'candidates': candidates,
+            })
+
+        data = {
+            'ok': True,
+            'source': 'Tribunal Superior Eleitoral (TSE)',
+            'regions': regions,
+            'stale': False,
+            'refresh_seconds': TSE_REGION_CACHE_SECONDS,
+        }
+        _region_cache['data'] = data
+        _region_cache['fetched_at'] = now
+        return data
 
 
 class Poll(db.Model):
@@ -385,6 +531,18 @@ def official_results_api():
         return jsonify({
             'ok': False,
             'error': 'Não foi possível consultar o TSE neste momento. Tente novamente em instantes.'
+        }), 503
+
+
+
+@app.get('/api/apuracao-regioes')
+def official_regions_api():
+    try:
+        return jsonify(fetch_region_results())
+    except Exception:
+        return jsonify({
+            'ok': False,
+            'error': 'Não foi possível consolidar os resultados regionais do TSE neste momento.'
         }), 503
 
 
