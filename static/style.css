@@ -39,3 +39,33 @@
 @media(max-width:560px){
   .urna-top-strip{padding:0 14px;font-size:.56rem}.urna-top-strip strong{font-size:.7rem}.urna-screen-panel{padding:12px}.urna-screen{padding:14px;border-width:6px;min-height:315px}.urna-screen-top{font-size:.62rem}.urna-screen-top strong{font-size:.72rem}.urna-input-row{margin:15px 0 12px;gap:8px;font-size:.86rem}.urna-digit-box{width:27px;height:35px;font-size:1.2rem}.urna-candidate{grid-template-columns:minmax(0,1fr) 94px;gap:10px;min-height:112px}.urna-photo-placeholder{width:94px;height:112px}.urna-photo-placeholder span{font-size:2.8rem}.urna-candidate-data h2{font-size:1.25rem}.urna-keyboard-panel{padding:18px 14px 22px}.urna-keyboard-title{height:50px}.urna-keypad{grid-template-columns:repeat(3,62px);gap:9px 10px}.urna-key{width:62px;height:49px;font-size:1.4rem}.urna-actions{gap:5px}.urna-action{min-height:48px;font-size:.58rem}.urna-action.confirm{min-height:58px}.urna-options-head{align-items:flex-start;flex-direction:column}
 }
+
+
+/* Assistente virtual Reis Tech */
+.reis-assistant{display:grid;grid-template-columns:92px minmax(0,1fr);gap:18px;align-items:center;margin:8px 0 24px;padding:18px 20px;border:1px solid #2e4f7e;border-radius:20px;background:linear-gradient(135deg,#101a31,#10284a 58%,#0e3554);box-shadow:0 18px 42px #0005;position:relative;overflow:hidden}
+.reis-assistant:after{content:"";position:absolute;width:180px;height:180px;border-radius:50%;background:#38bdf822;right:-65px;top:-85px;filter:blur(4px);pointer-events:none}
+.reis-assistant-robot{width:82px;height:82px;border-radius:24px;background:linear-gradient(145deg,#1d4ed8,#20b8e6);display:grid;place-items:center;position:relative;box-shadow:inset 0 1px 0 #ffffff55,0 10px 24px #0005}
+.reis-assistant-face{font-size:2.7rem;line-height:1;position:relative;z-index:2}
+.reis-assistant-pulse{position:absolute;inset:-6px;border:2px solid #61e8ff88;border-radius:28px;animation:reisPulse 1.9s ease-out infinite}
+@keyframes reisPulse{0%{transform:scale(.94);opacity:.9}70%{transform:scale(1.12);opacity:0}100%{opacity:0}}
+.reis-assistant-content{position:relative;z-index:1}
+.reis-assistant-label{font-size:.7rem;font-weight:900;letter-spacing:.14em;color:#68e3ff;margin-bottom:5px}
+.reis-assistant-content h2{margin:0 0 6px;font-size:1.35rem}
+.reis-assistant-content p{margin:0 0 12px;color:#d7e6ff;font-size:.98rem;line-height:1.5;max-width:760px}
+.reis-assistant-actions{display:flex;gap:10px;flex-wrap:wrap}
+.assistant-speak-btn,.assistant-start-btn{padding:10px 14px;border-radius:11px;font-size:.83rem;min-height:42px}
+.assistant-speak-btn{background:linear-gradient(135deg,#39d98a,#61e5a7);color:#07170f}
+.assistant-start-btn{background:#f7fbff;color:#12213b;border:1px solid #d9e7f7}
+.assistant-speak-btn:active,.assistant-start-btn:active{transform:translateY(1px)}
+
+@media(max-width:560px){
+  .reis-assistant{grid-template-columns:64px minmax(0,1fr);gap:12px;padding:14px;border-radius:16px}
+  .reis-assistant-robot{width:60px;height:60px;border-radius:18px}
+  .reis-assistant-face{font-size:2rem}
+  .reis-assistant-pulse{border-radius:21px}
+  .reis-assistant-label{font-size:.58rem;letter-spacing:.1em}
+  .reis-assistant-content h2{font-size:1.05rem}
+  .reis-assistant-content p{font-size:.88rem;line-height:1.4}
+  .reis-assistant-actions{grid-column:1 / -1}
+  .assistant-speak-btn,.assistant-start-btn{flex:1 1 145px;padding:9px 10px;font-size:.75rem}
+}
