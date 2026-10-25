@@ -155,42 +155,67 @@
     <div class="source-note">Dados oficiais publicados pelo Tribunal Superior Eleitoral (TSE)</div>
   </div>
 
-  <div id="status" class="status-box">Consultando os dados oficiais do TSE…</div>
+  <div id="status" class="status-box">{% if official_data %}Apuração em andamento — dados oficiais do TSE.{% else %}Consultando os dados oficiais do TSE…{% endif %}</div>
 
   <div class="summary-grid">
     <div class="metric">
       <div class="metric-label">Seções totalizadas</div>
-      <div id="sectionsPct" class="metric-value">0,00%</div>
+      <div id="sectionsPct" class="metric-value">{% if official_data %}{{ '%.2f'|format(official_data.sections.pct)|replace('.', ',') }}%{% else %}0,00%{% endif %}</div>
     </div>
     <div class="metric">
       <div class="metric-label">Seções</div>
-      <div id="sectionsCount" class="metric-value">0 / 0</div>
+      <div id="sectionsCount" class="metric-value">{% if official_data %}{{ official_data.sections.counted }} / {{ official_data.sections.total }}{% else %}0 / 0{% endif %}</div>
     </div>
     <div class="metric">
       <div class="metric-label">Total de votos</div>
-      <div id="votesTotal" class="metric-value">0</div>
+      <div id="votesTotal" class="metric-value">{% if official_data %}{{ "{:,}".format(official_data.votes.total).replace(",", ".") }}{% else %}0{% endif %}</div>
     </div>
     <div class="metric">
       <div class="metric-label">Votos válidos</div>
-      <div id="votesValid" class="metric-value">0</div>
+      <div id="votesValid" class="metric-value">{% if official_data %}{{ "{:,}".format(official_data.votes.valid).replace(",", ".") }}{% else %}0{% endif %}</div>
     </div>
   </div>
 
   <div class="chart-title">Gráfico — percentual e total de votos</div>
-  <div id="candidates"></div>
+  <div id="candidates">
+    {% if official_data %}
+      {% for candidate in official_data.candidates %}
+      <article class="candidate-card">
+        <div class="candidate-top">
+          <div class="candidate-avatar-ring" style="--pct: {{ candidate.pct }};">
+            {% if candidate.photo_url %}
+            <img class="candidate-avatar" src="{{ candidate.photo_url }}" alt="Foto do candidato {{ candidate.name }}">
+            {% else %}
+            <div class="candidate-avatar-fallback">{{ candidate.name[:2] }}</div>
+            {% endif %}
+          </div>
+          <div class="candidate-info">
+            <div class="candidate-party">{{ candidate.party }} – {{ candidate.number }}</div>
+            <div class="candidate-name">{{ candidate.name }}</div>
+          </div>
+          <div class="candidate-score">
+            <div class="candidate-pct">{{ '%.2f'|format(candidate.pct)|replace('.', ',') }}%</div>
+            <div class="candidate-votes">{{ "{:,}".format(candidate.votes).replace(",", ".") }} votos</div>
+          </div>
+        </div>
+        <div class="bar-track"><div class="bar-fill" style="width: {{ candidate.pct }}%;"></div></div>
+      </article>
+      {% endfor %}
+    {% endif %}
+  </div>
 
   <div class="summary-grid">
     <div class="metric">
       <div class="metric-label">Brancos</div>
-      <div id="votesBlank" class="metric-value">0</div>
+      <div id="votesBlank" class="metric-value">{% if official_data %}{{ "{:,}".format(official_data.votes.blank).replace(",", ".") }}{% else %}0{% endif %}</div>
     </div>
     <div class="metric">
       <div class="metric-label">Nulos</div>
-      <div id="votesNull" class="metric-value">0</div>
+      <div id="votesNull" class="metric-value">{% if official_data %}{{ "{:,}".format(official_data.votes.null).replace(",", ".") }}{% else %}0{% endif %}</div>
     </div>
     <div class="metric">
       <div class="metric-label">Eleitorado</div>
-      <div id="electorate" class="metric-value">0</div>
+      <div id="electorate" class="metric-value">{% if official_data %}{{ "{:,}".format(official_data.electorate.total).replace(",", ".") }}{% else %}0{% endif %}</div>
     </div>
     <div class="metric">
       <div class="metric-label">Atualização automática</div>
@@ -217,8 +242,29 @@
         <div id="mapLegend" class="map-legend"></div>
       </div>
       <aside id="regionDetail" class="region-detail">
-        <div class="region-detail-title">Carregando regiões…</div>
-        <div class="region-detail-meta">Consultando os arquivos estaduais do TSE.</div>
+        {% set initial_region = None %}
+        {% if regions_data %}
+          {% for r in regions_data.regions %}
+            {% if r.name == 'Nordeste' %}{% set initial_region = r %}{% endif %}
+          {% endfor %}
+          {% if not initial_region and regions_data.regions %}{% set initial_region = regions_data.regions[0] %}{% endif %}
+        {% endif %}
+        {% if initial_region %}
+          <div class="region-detail-title">{{ initial_region.name }}</div>
+          <div class="region-detail-meta">{{ initial_region.states|join(', ') }} • {{ '%.2f'|format(initial_region.sections.pct)|replace('.', ',') }}% das seções totalizadas</div>
+          {% for candidate in initial_region.candidates %}
+          <div class="region-candidate">
+            <div class="region-candidate-head">
+              <div><strong>{{ candidate.name }}</strong><div style="opacity:.72;font-size:.85rem;">{{ candidate.party }} • nº {{ candidate.number }} • {{ "{:,}".format(candidate.votes).replace(",", ".") }} votos</div></div>
+              <div class="region-candidate-pct">{{ '%.2f'|format(candidate.pct)|replace('.', ',') }}%</div>
+            </div>
+            <div class="region-mini-bar"><div class="region-mini-fill" style="width:{{ candidate.pct }}%; background:#2563eb;"></div></div>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="region-detail-title">Carregando regiões…</div>
+          <div class="region-detail-meta">Consultando os arquivos estaduais do TSE.</div>
+        {% endif %}
       </aside>
     </div>
 
