@@ -21,7 +21,7 @@
   <main class="container">
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% for category, message in messages %}
-        <div class="alert {{ category }}">{{ message }}</div>
+        <div class="alert {{ category }}" {% if category == 'duplicate-warning' %}data-duplicate-warning="1"{% endif %}>{{ message }}</div>
       {% endfor %}
     {% endwith %}
     {% block content %}{% endblock %}
@@ -30,5 +30,48 @@
     Sistema demonstrativo para pesquisa e estudo. Não possui vínculo com a Justiça Eleitoral.<br>
     <strong>Tecnologia desenvolvida por Reis Tech Software</strong> • Desenvolvedor: Franciel Reis
   </footer>
+
+  <script>
+    (() => {
+      const warning = document.querySelector('[data-duplicate-warning="1"]');
+      if (!warning) return;
+
+      function playDuplicateWarning() {
+        try {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (!AudioCtx) return;
+
+          const ctx = new AudioCtx();
+          const gain = ctx.createGain();
+          gain.connect(ctx.destination);
+          gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.14, ctx.currentTime + 0.02);
+
+          const tones = [
+            { frequency: 360, start: 0.00, duration: 0.12 },
+            { frequency: 260, start: 0.16, duration: 0.14 },
+            { frequency: 360, start: 0.34, duration: 0.12 }
+          ];
+
+          tones.forEach(tone => {
+            const osc = ctx.createOscillator();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(tone.frequency, ctx.currentTime + tone.start);
+            osc.connect(gain);
+            osc.start(ctx.currentTime + tone.start);
+            osc.stop(ctx.currentTime + tone.start + tone.duration);
+          });
+
+          gain.gain.setValueAtTime(0.14, ctx.currentTime + 0.42);
+          gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.52);
+          window.setTimeout(() => ctx.close().catch(() => {}), 650);
+        } catch (error) {}
+      }
+
+      // Alguns navegadores só liberam áudio após interação do usuário.
+      playDuplicateWarning();
+      document.addEventListener('click', playDuplicateWarning, { once: true });
+    })();
+  </script>
 </body>
 </html>
