@@ -98,7 +98,7 @@ def _normalize_tse_results(payload):
     votes = payload.get('v') or {}
     valid_votes = sum(candidate['votes'] for candidate in candidates)
     blank_votes = _safe_int(votes.get('vb'))
-    null_votes = _safe_int(votes.get('vn'))
+    null_votes = _safe_int(votes.get('tvn') or votes.get('vn'))
     total_votes = _safe_int(votes.get('tv')) or (valid_votes + blank_votes + null_votes)
 
     return {
