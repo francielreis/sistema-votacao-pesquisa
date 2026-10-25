@@ -6,7 +6,9 @@
   <p>Digite o número no teclado da urna e pressione <strong>CONFIRMA</strong>. Ambiente demonstrativo, sem vínculo com eleição oficial.</p>
 </section>
 
-{% if already_voted %}
+{% if admin_test_mode %}
+<div class="alert success"><strong>MODO TESTE ADMIN ATIVO:</strong> você está logado como administrador e pode registrar vários votos seguidos para testar a urna. Esses votos entram na apuração e podem ser apagados em “Zerar votos”.</div>
+{% elif already_voted %}
 <div class="alert warning">Este navegador já registrou um voto nesta pesquisa. <a href="{{ url_for('results') }}">Ver resultados</a>.</div>
 {% endif %}
 
@@ -149,6 +151,56 @@
   const maxDigits = 2;
   let typed = '';
   let mode = 'number';
+  let confirming = false;
+
+  function playVoteSound(onDone) {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) {
+        onDone();
+        return;
+      }
+
+      const ctx = new AudioCtx();
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.18, ctx.currentTime + 0.015);
+      gain.connect(ctx.destination);
+
+      const tones = [
+        { frequency: 880, start: 0.00, duration: 0.11 },
+        { frequency: 1046, start: 0.13, duration: 0.11 },
+        { frequency: 1318, start: 0.26, duration: 0.18 }
+      ];
+
+      tones.forEach(tone => {
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(tone.frequency, ctx.currentTime + tone.start);
+        osc.connect(gain);
+        osc.start(ctx.currentTime + tone.start);
+        osc.stop(ctx.currentTime + tone.start + tone.duration);
+      });
+
+      gain.gain.setValueAtTime(0.18, ctx.currentTime + 0.32);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.46);
+
+      window.setTimeout(() => {
+        ctx.close().catch(() => {});
+        onDone();
+      }, 520);
+    } catch (error) {
+      onDone();
+    }
+  }
+
+  function submitWithSound(form) {
+    if (!form || confirming) return;
+    confirming = true;
+    confirmBtn.disabled = true;
+    messageEl.innerHTML = '<strong>VOTO REGISTRADO</strong><br>Aguarde a confirmação.';
+    playVoteSound(() => form.submit());
+  }
 
   function renderDigits() {
     digitsEl.innerHTML = '';
@@ -239,20 +291,21 @@
   });
 
   confirmBtn?.addEventListener('click', () => {
+    if (confirming) return;
+
     if (mode === 'blank') {
-      document.getElementById('blankVoteForm')?.submit();
+      submitWithSound(document.getElementById('blankVoteForm'));
       return;
     }
 
     const candidate = currentCandidate();
     if (candidate) {
-      const form = document.getElementById('voteForm' + candidate.id);
-      if (form) form.submit();
+      submitWithSound(document.getElementById('voteForm' + candidate.id));
       return;
     }
 
     if (typed.length >= maxDigits) {
-      document.getElementById('nullVoteForm')?.submit();
+      submitWithSound(document.getElementById('nullVoteForm'));
       return;
     }
 
