@@ -536,10 +536,23 @@ def _attach_candidate_photos(data):
 
 @app.get('/apuracao-real')
 def official_results():
+    official_data = None
+    regions_data = None
+    try:
+        official_data = _attach_candidate_photos(fetch_tse_results())
+    except Exception:
+        official_data = None
+    try:
+        regions_data = _attach_candidate_photos(fetch_region_results())
+    except Exception:
+        regions_data = None
+
     return render_template(
         'official_results.html',
         title='Apuração Oficial em Tempo Real',
         official_page=True,
+        official_data=official_data,
+        regions_data=regions_data,
     )
 
 
