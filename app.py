@@ -47,11 +47,11 @@ TSE_RESULT_URL = os.getenv(
 TSE_CACHE_SECONDS = max(5, int(os.getenv('TSE_CACHE_SECONDS', '10')))
 TSE_TIMEOUT_SECONDS = max(3, int(os.getenv('TSE_TIMEOUT_SECONDS', '8')))
 
-# Fotos oficiais publicadas pelo TSE para os candidatos do 2º turno.
-# Servem como fallback quando nenhuma foto personalizada foi cadastrada no admin.
+# Retratos oficiais usados no painel quando nenhuma foto personalizada foi cadastrada.
+# Lula: acervo oficial do Governo Federal. Flávio Bolsonaro: retrato oficial do Senado.
 OFFICIAL_CANDIDATE_PHOTOS = {
-    '13': 'https://www.tse.jus.br/imagens/imagens/lula/%40%40images/image-200-93d51d895f8ebc8900bf3e02c7052bef.png',
-    '22': 'https://www.tse.jus.br/imagens/imagens/flavio-bolsonaro/%40%40images/image-200-7092d276831e3453f70c59d07d5c9ae7.png',
+    '13': 'https://www.gov.br/secretariageral/pt-br/centrais-de-conteudo/biblioteca-da-pr/galeria-dos-ex-presidentes/luiz-inacio-lula-da-silva/foto-oficial.jfif/@@images/image',
+    '22': 'https://legis.senado.leg.br/senadores/fotos-oficiais/5894',
 }
 
 _tse_cache = {
@@ -537,7 +537,7 @@ def _attach_candidate_photos(data):
             custom_photo = photo_map.get(number)
             official_photo = OFFICIAL_CANDIDATE_PHOTOS.get(number, '')
             candidate['photo_url'] = custom_photo or official_photo
-            candidate['photo_source'] = 'cadastro' if custom_photo else ('TSE' if official_photo else '')
+            candidate['photo_source'] = 'cadastro' if custom_photo else ('oficial' if official_photo else '')
 
     apply(data.get('candidates'))
     for region in data.get('regions', []) or []:
