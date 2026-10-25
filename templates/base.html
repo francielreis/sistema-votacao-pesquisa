@@ -13,11 +13,16 @@
       <nav>
         <a href="{{ url_for('index') }}">Votar</a>
         <a href="{{ url_for('results') }}">Resultados</a>
+        <a href="{{ url_for('official_results') }}">Apuração real</a>
         <a href="{{ url_for('admin') }}">Admin</a>
       </nav>
     </div>
   </header>
+  {% if official_page %}
+  <div class="simulation-warning">APURAÇÃO OFICIAL — DADOS DO TSE • PAINEL INDEPENDENTE</div>
+  {% else %}
   <div class="simulation-warning">SIMULAÇÃO PARA PESQUISA — NÃO É UMA ELEIÇÃO OFICIAL.</div>
+  {% endif %}
   <main class="container">
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% for category, message in messages %}
@@ -27,8 +32,13 @@
     {% block content %}{% endblock %}
   </main>
   <footer>
+    {% if official_page %}
+    Painel independente de acompanhamento. Dados obtidos dos arquivos públicos do Tribunal Superior Eleitoral (TSE).<br>
+    <strong>Tecnologia desenvolvida por Reis Tech Software</strong> • Desenvolvedor: Franciel Reis
+    {% else %}
     Sistema demonstrativo para pesquisa e estudo. Não possui vínculo com a Justiça Eleitoral.<br>
     <strong>Tecnologia desenvolvida por Reis Tech Software</strong> • Desenvolvedor: Franciel Reis
+    {% endif %}
   </footer>
 
   <script>
