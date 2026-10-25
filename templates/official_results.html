@@ -531,7 +531,7 @@
       <small id="robotSpeechMeta">Os dados são atualizados automaticamente a cada 10 segundos.</small>
       <div class="robot-voice-controls">
         <button id="robotVoiceToggle" class="robot-voice-btn" type="button">🔇 Desativar voz</button>
-        <button id="robotSpeakNow" class="robot-voice-btn secondary" type="button">▶️ Falar agora</button>
+        <button id="robotSpeakNow" class="robot-voice-btn" type="button">🔊 OUVIR ROBÔ AGORA</button>
       </div>
       <div id="robotVoiceStatus" class="robot-voice-status active">Voz automática ligada — tentando falar ao abrir</div>
     </div>
@@ -961,7 +961,7 @@
   }
 
   function robotSpeech(data) {
-    if (!data) return 'Aguardando os dados oficiais do Tribunal Superior Eleitoral.';
+    if (!data) return 'Olá. Eu sou o robô da Reis Tech e Software. A voz está funcionando. Neste momento estou aguardando os dados oficiais do TSE, Tribunal Superior Eleitoral.';
     const candidates = data.candidates || [];
     const candidateText = candidates.map(function(candidate) {
       const pct = Number(candidate.pct || 0).toLocaleString('pt-BR', {
@@ -1018,6 +1018,14 @@
     utterance.pitch = 1;
     utterance.volume = 1;
 
+    const voices = window.speechSynthesis.getVoices ? window.speechSynthesis.getVoices() : [];
+    const ptVoice = voices.find(function(voice) {
+      return /^pt-BR$/i.test(voice.lang || '');
+    }) || voices.find(function(voice) {
+      return /^pt/i.test(voice.lang || '');
+    });
+    if (ptVoice) utterance.voice = ptVoice;
+
     let started = false;
     utterance.onstart = function() {
       started = true;
@@ -1072,11 +1080,11 @@
       robotVoiceEnabled = !robotVoiceEnabled;
       updateRobotVoiceUI();
 
-      if (robotVoiceEnabled && latestOfficialData) {
+      if (robotVoiceEnabled) {
         robotUserGestureSeen = true;
         robotVoiceUnlocked = true;
         if ('speechSynthesis' in window) window.speechSynthesis.resume();
-        speakRobot(latestOfficialData, true);
+        speakRobot(latestOfficialData || null, true);
       } else if (!robotVoiceEnabled && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel();
         setRobotSpeaking(false);
@@ -1085,12 +1093,39 @@
   }
 
   if (els.robotSpeakNow) {
-    els.robotSpeakNow.addEventListener('click', function(event) {
+    els.robotSpeakNow.addEventListener('pointerdown', function(event) {
       event.stopPropagation();
+    });
+
+    els.robotSpeakNow.addEventListener('click', function(event) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      robotVoiceEnabled = true;
       robotUserGestureSeen = true;
       robotVoiceUnlocked = true;
-      if ('speechSynthesis' in window) window.speechSynthesis.resume();
-      if (latestOfficialData) speakRobot(latestOfficialData, true);
+
+      if (!('speechSynthesis' in window)) {
+        if (els.robotVoiceStatus) {
+          els.robotVoiceStatus.textContent = 'Este navegador não oferece voz do sistema.';
+          els.robotVoiceStatus.classList.remove('active');
+        }
+        return;
+      }
+
+      try {
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.resume();
+      } catch (error) {}
+
+      if (els.robotVoiceStatus) {
+        els.robotVoiceStatus.textContent = 'Falando agora…';
+        els.robotVoiceStatus.classList.add('active');
+      }
+
+      // Importante: fala executada diretamente dentro do clique do usuário.
+      // Isso evita o bloqueio de autoplay do Chrome/Android.
+      speakRobot(latestOfficialData || null, true);
     });
   }
 
@@ -1118,9 +1153,10 @@
     }
   }
 
-  document.addEventListener('pointerdown', unlockRobotVoiceFromAnyInteraction, { passive: true });
-  document.addEventListener('touchstart', unlockRobotVoiceFromAnyInteraction, { passive: true });
-  document.addEventListener('click', unlockRobotVoiceFromAnyInteraction);
+  document.addEventListener('click', function(event) {
+    if (event.target && event.target.closest && event.target.closest('#robotVoiceToggle, #robotSpeakNow')) return;
+    unlockRobotVoiceFromAnyInteraction();
+  });
   document.addEventListener('keydown', unlockRobotVoiceFromAnyInteraction);
 
   updateRobotVoiceUI();
