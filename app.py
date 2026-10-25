@@ -5,6 +5,7 @@ from functools import wraps
 
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import inspect, text
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-change-me')
@@ -52,6 +53,7 @@ class Vote(db.Model):
     poll_id = db.Column(db.Integer, db.ForeignKey('poll.id'), nullable=False)
     candidate_id = db.Column(db.Integer, db.ForeignKey('candidate.id'), nullable=False)
     voter_hash = db.Column(db.String(64), nullable=False)
+    device_hash = db.Column(db.String(64), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
     __table_args__ = (
@@ -69,13 +71,25 @@ def current_poll():
 
 
 def voter_fingerprint():
-    # Identificador anônimo por navegador/sessão. Evita bloquear pessoas diferentes
-    # que estejam na mesma rede/IP durante uma pesquisa simulada.
+    # Identificador anônimo por navegador/sessão.
     token = session.get('voter_token')
     if not token:
         token = os.urandom(32).hex()
         session['voter_token'] = token
     raw = f"{token}|{app.config['SECRET_KEY']}"
+    return hashlib.sha256(raw.encode('utf-8')).hexdigest()
+
+
+def device_fingerprint():
+    # Camada adicional para dificultar votos repetidos após limpar cookies.
+    # Não armazena IP, user-agent ou idioma em texto puro: apenas um hash.
+    forwarded = request.headers.get('X-Forwarded-For', '')
+    ip = forwarded.split(',')[0].strip() if forwarded else (request.remote_addr or '')
+    ua = request.headers.get('User-Agent', '')
+    language = request.headers.get('Accept-Language', '')
+    platform = request.headers.get('Sec-CH-UA-Platform', '')
+    mobile = request.headers.get('Sec-CH-UA-Mobile', '')
+    raw = f"{ip}|{ua}|{language}|{platform}|{mobile}|{app.config['SECRET_KEY']}"
     return hashlib.sha256(raw.encode('utf-8')).hexdigest()
 
 
@@ -109,11 +123,21 @@ def register_vote(candidate, success_message='Voto simulado registrado com suces
         fp = hashlib.sha256(raw.encode('utf-8')).hexdigest()
     else:
         fp = voter_fingerprint()
-        if Vote.query.filter_by(poll_id=poll.id, voter_hash=fp).first():
-            flash('Só é permitida uma simulação por pessoa neste navegador. Reis Tech Software • Desenvolvedor: Franciel Reis', 'duplicate-warning')
+        device_fp = device_fingerprint()
+        repeated = Vote.query.filter_by(poll_id=poll.id, voter_hash=fp).first()
+        if not repeated:
+            repeated = Vote.query.filter_by(poll_id=poll.id, device_hash=device_fp).first()
+
+        if repeated:
+            flash('Só é permitida uma simulação por pessoa/dispositivo nesta pesquisa. Reis Tech Software • Desenvolvedor: Franciel Reis', 'duplicate-warning')
             return redirect(url_for('results'))
 
-    db.session.add(Vote(poll_id=poll.id, candidate_id=candidate.id, voter_hash=fp))
+    db.session.add(Vote(
+        poll_id=poll.id,
+        candidate_id=candidate.id,
+        voter_hash=fp,
+        device_hash=None if admin_test_mode else device_fp,
+    ))
     db.session.commit()
 
     if admin_test_mode:
@@ -266,6 +290,18 @@ def health():
 
 with app.app_context():
     db.create_all()
+
+    # Migração leve para instalações já existentes, sem apagar votos.
+    columns = {col['name'] for col in inspect(db.engine).get_columns('vote')}
+    if 'device_hash' not in columns:
+        db.session.execute(text('ALTER TABLE vote ADD COLUMN device_hash VARCHAR(64)'))
+        db.session.commit()
+
+    db.session.execute(text(
+        'CREATE UNIQUE INDEX IF NOT EXISTS uq_poll_device_hash '
+        'ON vote (poll_id, device_hash) WHERE device_hash IS NOT NULL'
+    ))
+    db.session.commit()
 
 
 if __name__ == '__main__':
