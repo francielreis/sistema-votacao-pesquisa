@@ -1252,34 +1252,46 @@
     robotUserGestureSeen = true;
     robotVoiceUnlocked = true;
 
-    if ('speechSynthesis' in window) {
-      try { window.speechSynthesis.resume(); } catch (error) {}
+    if (!('speechSynthesis' in window)) {
+      if (els.robotVoiceStatus) {
+        els.robotVoiceStatus.textContent = 'Este navegador não oferece voz do sistema.';
+        els.robotVoiceStatus.classList.remove('active');
+      }
+      return;
     }
 
-    if (latestOfficialData) {
-      robotPendingAfterGesture = false;
-      speakRobot(latestOfficialData, true);
-    } else {
-      robotPendingAfterGesture = true;
-      speakRobot(null, true);
-      if (els.robotVoiceStatus) {
-        els.robotVoiceStatus.textContent = 'Voz liberada — o robô falará agora e atualizará quando os dados do TSE chegarem';
-        els.robotVoiceStatus.classList.add('active');
-      }
+    // Uma tentativa automática bloqueada pode ficar pendente no Chrome/Android.
+    // No primeiro gesto real do usuário, cancela essa fila e inicia uma fala nova
+    // dentro do próprio gesto, aumentando a compatibilidade com celulares.
+    try {
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.resume();
+    } catch (error) {}
+
+    robotPendingAfterGesture = !latestOfficialData;
+
+    if (els.robotVoiceStatus) {
+      els.robotVoiceStatus.textContent = latestOfficialData
+        ? 'Voz liberada — iniciando locução agora'
+        : 'Voz liberada — aguardando os dados do TSE para iniciar a locução';
+      els.robotVoiceStatus.classList.add('active');
     }
+
+    restartRobotSpeech(latestOfficialData || null);
   }
 
-  document.addEventListener('click', function(event) {
-    if (event.target && event.target.closest && event.target.closest('#robotVoiceToggle, #robotSpeakNow')) return;
+  function handleFirstRobotGesture(event) {
+    if (event && event.target && event.target.closest &&
+        event.target.closest('#robotVoiceToggle, #robotSpeakNow')) return;
     unlockRobotVoiceFromAnyInteraction();
-  });
-  // pointerdown também dispara quando a pessoa toca e começa a rolar a tela.
-  // Assim o primeiro gesto no celular libera a voz mesmo sem virar um clique.
-  document.addEventListener('pointerdown', function(event) {
-    if (event.target && event.target.closest && event.target.closest('#robotVoiceToggle, #robotSpeakNow')) return;
-    unlockRobotVoiceFromAnyInteraction();
-  }, { passive: true });
-  document.addEventListener('keydown', unlockRobotVoiceFromAnyInteraction);
+  }
+
+  // O primeiro toque/clique/tecla em qualquer área da página libera a voz.
+  // touchstart cobre navegadores Android que não disparam Pointer Events de forma confiável.
+  document.addEventListener('touchstart', handleFirstRobotGesture, { passive: true, capture: true });
+  document.addEventListener('pointerdown', handleFirstRobotGesture, { passive: true, capture: true });
+  document.addEventListener('click', handleFirstRobotGesture, { capture: true });
+  document.addEventListener('keydown', handleFirstRobotGesture, { capture: true });
 
   document.addEventListener('visibilitychange', function() {
     if (!document.hidden && robotVoiceEnabled && robotUserGestureSeen && 'speechSynthesis' in window) {
