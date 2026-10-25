@@ -681,6 +681,8 @@
   let robotVoiceEnabled = true;
   let robotVoiceUnlocked = false;
   let robotAutoAttempted = false;
+  let robotUserGestureSeen = false;
+  let robotPendingAfterGesture = false;
   let lastSpokenSignature = '';
 
   const els = {
@@ -1058,22 +1060,22 @@
     }
     if (els.robotVoiceStatus) {
       els.robotVoiceStatus.textContent = robotVoiceEnabled
-        ? 'Voz automática ligada — o robô tentará falar ao abrir e quando os dados mudarem'
+        ? 'Voz automática ligada — o robô tenta falar ao abrir e, se o navegador bloquear, fala no primeiro toque na página'
         : 'Voz automática desligada';
       els.robotVoiceStatus.classList.toggle('active', robotVoiceEnabled);
     }
   }
 
   if (els.robotVoiceToggle) {
-    els.robotVoiceToggle.addEventListener('click', function() {
+    els.robotVoiceToggle.addEventListener('click', function(event) {
+      event.stopPropagation();
       robotVoiceEnabled = !robotVoiceEnabled;
-      try {
-        localStorage.setItem('reisRobotVoice', robotVoiceEnabled ? 'on' : 'off');
-      } catch (error) {}
       updateRobotVoiceUI();
 
       if (robotVoiceEnabled && latestOfficialData) {
+        robotUserGestureSeen = true;
         robotVoiceUnlocked = true;
+        if ('speechSynthesis' in window) window.speechSynthesis.resume();
         speakRobot(latestOfficialData, true);
       } else if (!robotVoiceEnabled && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel();
@@ -1083,26 +1085,41 @@
   }
 
   if (els.robotSpeakNow) {
-    els.robotSpeakNow.addEventListener('click', function() {
+    els.robotSpeakNow.addEventListener('click', function(event) {
+      event.stopPropagation();
+      robotUserGestureSeen = true;
       robotVoiceUnlocked = true;
+      if ('speechSynthesis' in window) window.speechSynthesis.resume();
       if (latestOfficialData) speakRobot(latestOfficialData, true);
     });
   }
 
-  try {
-    const savedVoice = localStorage.getItem('reisRobotVoice');
-    if (savedVoice === 'off') robotVoiceEnabled = false;
-    if (savedVoice === 'on') robotVoiceEnabled = true;
-  } catch (error) {}
+  function unlockRobotVoiceFromAnyInteraction() {
+    if (!robotVoiceEnabled) return;
 
-  function unlockRobotVoiceFromAnyTap() {
-    if (!robotVoiceEnabled || robotVoiceUnlocked || !latestOfficialData) return;
+    robotUserGestureSeen = true;
     robotVoiceUnlocked = true;
-    speakRobot(latestOfficialData, true);
+
+    if ('speechSynthesis' in window) {
+      try { window.speechSynthesis.resume(); } catch (error) {}
+    }
+
+    if (latestOfficialData) {
+      robotPendingAfterGesture = false;
+      speakRobot(latestOfficialData, true);
+    } else {
+      robotPendingAfterGesture = true;
+      if (els.robotVoiceStatus) {
+        els.robotVoiceStatus.textContent = 'Voz liberada — aguardando os dados oficiais para falar';
+        els.robotVoiceStatus.classList.add('active');
+      }
+    }
   }
 
-  document.addEventListener('pointerdown', unlockRobotVoiceFromAnyTap, { passive: true });
-  document.addEventListener('keydown', unlockRobotVoiceFromAnyTap);
+  document.addEventListener('pointerdown', unlockRobotVoiceFromAnyInteraction, { passive: true });
+  document.addEventListener('touchstart', unlockRobotVoiceFromAnyInteraction, { passive: true });
+  document.addEventListener('click', unlockRobotVoiceFromAnyInteraction);
+  document.addEventListener('keydown', unlockRobotVoiceFromAnyInteraction);
 
   updateRobotVoiceUI();
 
@@ -1149,7 +1166,14 @@
       updateRobotBubble(data);
 
       if (robotVoiceEnabled) {
-        if (!robotAutoAttempted) {
+        if (robotPendingAfterGesture || robotUserGestureSeen) {
+          robotPendingAfterGesture = false;
+          robotVoiceUnlocked = true;
+          if ('speechSynthesis' in window) {
+            try { window.speechSynthesis.resume(); } catch (error) {}
+          }
+          speakRobot(data, true);
+        } else if (!robotAutoAttempted) {
           robotAutoAttempted = true;
           speakRobot(data, true);
         } else {
