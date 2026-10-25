@@ -237,12 +237,23 @@
   function geoBounds(geo) {
     const pts = [];
     geo.features.forEach(f => collectCoords(f.geometry, pts));
-    const lons = pts.map(p => p[0]);
-    const lats = pts.map(p => p[1]);
-    return {
-      minLon: Math.min(...lons), maxLon: Math.max(...lons),
-      minLat: Math.min(...lats), maxLat: Math.max(...lats)
-    };
+
+    let minLon = Infinity;
+    let maxLon = -Infinity;
+    let minLat = Infinity;
+    let maxLat = -Infinity;
+
+    for (const point of pts) {
+      const lon = Number(point[0]);
+      const lat = Number(point[1]);
+      if (!Number.isFinite(lon) || !Number.isFinite(lat)) continue;
+      if (lon < minLon) minLon = lon;
+      if (lon > maxLon) maxLon = lon;
+      if (lat < minLat) minLat = lat;
+      if (lat > maxLat) maxLat = lat;
+    }
+
+    return { minLon, maxLon, minLat, maxLat };
   }
 
   function projectPoint(point, bounds, width=760, height=700, pad=35) {
@@ -269,10 +280,22 @@
   function featureCenter(feature, bounds) {
     const pts = [];
     collectCoords(feature.geometry, pts);
-    const projected = pts.map(p => projectPoint(p, bounds));
-    const xs = projected.map(p => p[0]);
-    const ys = projected.map(p => p[1]);
-    return [(Math.min(...xs)+Math.max(...xs))/2, (Math.min(...ys)+Math.max(...ys))/2];
+
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+
+    for (const point of pts) {
+      const [x, y] = projectPoint(point, bounds);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+
+    return [(minX + maxX) / 2, (minY + maxY) / 2];
   }
 
   function regionByName(name) {
@@ -360,7 +383,17 @@
   function renderRegionMap() {
     if (!regionGeo || !regionData) return;
     els.brazilMap.replaceChildren();
-    const bounds = geoBounds(regionGeo);
+
+    let bounds;
+    try {
+      bounds = geoBounds(regionGeo);
+      if (![bounds.minLon, bounds.maxLon, bounds.minLat, bounds.maxLat].every(Number.isFinite)) {
+        throw new Error('Limites geográficos inválidos');
+      }
+    } catch (error) {
+      els.regionUpdated.textContent = 'O mapa não pôde ser desenhado neste navegador. Os dados regionais continuam disponíveis abaixo.';
+      return;
+    }
 
     regionGeo.features.forEach(feature => {
       const name = feature.properties.region;
