@@ -962,13 +962,19 @@
 
   function robotSpeech(data) {
     if (!data) return 'Olá. Eu sou o robô da Reis Tech e Software. A voz está funcionando. Neste momento estou aguardando os dados oficiais do TSE, Tribunal Superior Eleitoral.';
+
     const candidates = data.candidates || [];
     const candidateText = candidates.map(function(candidate) {
       const pct = Number(candidate.pct || 0).toLocaleString('pt-BR', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
       });
-      return (candidate.name || 'Candidato') + ', ' + pct + ' por cento';
+
+      const name = candidate.name || 'Candidato';
+      const party = candidate.party ? ', partido ' + candidate.party : '';
+      const number = candidate.number ? ', número ' + candidate.number : '';
+
+      return name + party + number + ', com ' + pct + ' por cento dos votos válidos';
     }).join('. ');
 
     const sections = Number(data.sections?.pct || 0).toLocaleString('pt-BR', {
