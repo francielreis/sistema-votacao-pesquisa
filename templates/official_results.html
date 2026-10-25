@@ -1,0 +1,205 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+  .official-wrap { max-width: 980px; margin: 0 auto; padding: 22px 0 36px; }
+  .official-hero { text-align: center; margin-bottom: 22px; }
+  .official-hero h1 { margin-bottom: 8px; }
+  .live-badge { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; font-size: .9rem; }
+  .live-dot { width: 10px; height: 10px; border-radius: 50%; background: #e53935; box-shadow: 0 0 0 5px rgba(229,57,53,.12); }
+  .source-note { opacity: .78; margin-top: 8px; }
+  .status-box { margin: 18px 0; padding: 14px 16px; border-radius: 14px; background: rgba(0,0,0,.06); font-weight: 700; text-align: center; }
+  .summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; margin: 18px 0 24px; }
+  .metric { border: 1px solid rgba(127,127,127,.25); border-radius: 16px; padding: 16px; background: rgba(255,255,255,.04); }
+  .metric-label { font-size: .82rem; opacity: .72; margin-bottom: 6px; }
+  .metric-value { font-size: 1.45rem; font-weight: 900; line-height: 1.1; }
+  .candidate-card { border: 1px solid rgba(127,127,127,.28); border-radius: 18px; padding: 18px; margin-bottom: 15px; background: rgba(255,255,255,.035); }
+  .candidate-top { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
+  .candidate-name { font-size: 1.2rem; font-weight: 900; }
+  .candidate-party { opacity: .72; font-size: .92rem; margin-top: 3px; }
+  .candidate-score { text-align: right; white-space: nowrap; }
+  .candidate-pct { font-size: 1.7rem; font-weight: 950; }
+  .candidate-votes { font-size: .9rem; opacity: .78; margin-top: 2px; }
+  .bar-track { height: 22px; border-radius: 999px; overflow: hidden; background: rgba(127,127,127,.18); margin-top: 14px; }
+  .bar-fill { height: 100%; min-width: 0; border-radius: inherit; background: linear-gradient(90deg,#1976d2,#42a5f5); transition: width .7s ease; }
+  .chart-title { margin: 6px 0 14px; font-size: 1.05rem; font-weight: 900; }
+  .updated { text-align: center; margin-top: 18px; opacity: .7; font-size: .9rem; }
+  .official-disclaimer { margin-top: 20px; padding: 14px; border-left: 4px solid #1976d2; background: rgba(25,118,210,.08); border-radius: 10px; }
+  @media (max-width: 760px) {
+    .summary-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .candidate-top { align-items: center; }
+    .candidate-pct { font-size: 1.45rem; }
+  }
+</style>
+
+<section class="official-wrap">
+  <div class="official-hero">
+    <div class="live-badge"><span class="live-dot"></span> APURAÇÃO OFICIAL EM TEMPO REAL</div>
+    <h1>Presidente da República — 2º turno 2026</h1>
+    <div class="source-note">Dados oficiais publicados pelo Tribunal Superior Eleitoral (TSE)</div>
+  </div>
+
+  <div id="status" class="status-box">Consultando os dados oficiais do TSE…</div>
+
+  <div class="summary-grid">
+    <div class="metric">
+      <div class="metric-label">Seções totalizadas</div>
+      <div id="sectionsPct" class="metric-value">0,00%</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Seções</div>
+      <div id="sectionsCount" class="metric-value">0 / 0</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Total de votos</div>
+      <div id="votesTotal" class="metric-value">0</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Votos válidos</div>
+      <div id="votesValid" class="metric-value">0</div>
+    </div>
+  </div>
+
+  <div class="chart-title">Gráfico — percentual e total de votos</div>
+  <div id="candidates"></div>
+
+  <div class="summary-grid">
+    <div class="metric">
+      <div class="metric-label">Brancos</div>
+      <div id="votesBlank" class="metric-value">0</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Nulos</div>
+      <div id="votesNull" class="metric-value">0</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Eleitorado</div>
+      <div id="electorate" class="metric-value">0</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Atualização automática</div>
+      <div class="metric-value">10 s</div>
+    </div>
+  </div>
+
+  <div id="updated" class="updated">Aguardando atualização…</div>
+
+  <div class="official-disclaimer">
+    <strong>Importante:</strong> este é um painel independente. Os números exibidos vêm dos arquivos públicos de totalização do TSE e não são projeções nem resultados do simulador de votação.
+  </div>
+</section>
+
+<script>
+(() => {
+  const fmtInt = new Intl.NumberFormat('pt-BR');
+  const fmtPct = (value) => Number(value || 0).toLocaleString('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }) + '%';
+
+  const els = {
+    status: document.getElementById('status'),
+    sectionsPct: document.getElementById('sectionsPct'),
+    sectionsCount: document.getElementById('sectionsCount'),
+    votesTotal: document.getElementById('votesTotal'),
+    votesValid: document.getElementById('votesValid'),
+    votesBlank: document.getElementById('votesBlank'),
+    votesNull: document.getElementById('votesNull'),
+    electorate: document.getElementById('electorate'),
+    candidates: document.getElementById('candidates'),
+    updated: document.getElementById('updated')
+  };
+
+  function renderCandidates(candidates) {
+    els.candidates.replaceChildren();
+
+    (candidates || []).forEach((candidate) => {
+      const card = document.createElement('article');
+      card.className = 'candidate-card';
+
+      const top = document.createElement('div');
+      top.className = 'candidate-top';
+
+      const left = document.createElement('div');
+      const name = document.createElement('div');
+      name.className = 'candidate-name';
+      name.textContent = candidate.name || 'Candidato';
+
+      const party = document.createElement('div');
+      party.className = 'candidate-party';
+      party.textContent = [candidate.party, candidate.number ? 'nº ' + candidate.number : '']
+        .filter(Boolean).join(' • ');
+
+      left.append(name, party);
+
+      const score = document.createElement('div');
+      score.className = 'candidate-score';
+
+      const pct = document.createElement('div');
+      pct.className = 'candidate-pct';
+      pct.textContent = fmtPct(candidate.pct);
+
+      const votes = document.createElement('div');
+      votes.className = 'candidate-votes';
+      votes.textContent = fmtInt(candidate.votes || 0) + ' votos';
+
+      score.append(pct, votes);
+      top.append(left, score);
+
+      const track = document.createElement('div');
+      track.className = 'bar-track';
+
+      const fill = document.createElement('div');
+      fill.className = 'bar-fill';
+      fill.style.width = Math.max(0, Math.min(100, Number(candidate.pct || 0))) + '%';
+
+      track.append(fill);
+      card.append(top, track);
+      els.candidates.append(card);
+    });
+  }
+
+  async function loadResults() {
+    try {
+      const response = await fetch('{{ url_for("official_results_api") }}', { cache: 'no-store' });
+      const data = await response.json();
+
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error || 'Falha ao consultar a apuração.');
+      }
+
+      els.sectionsPct.textContent = fmtPct(data.sections.pct);
+      els.sectionsCount.textContent = fmtInt(data.sections.counted) + ' / ' + fmtInt(data.sections.total);
+      els.votesTotal.textContent = fmtInt(data.votes.total);
+      els.votesValid.textContent = fmtInt(data.votes.valid);
+      els.votesBlank.textContent = fmtInt(data.votes.blank);
+      els.votesNull.textContent = fmtInt(data.votes.null);
+      els.electorate.textContent = fmtInt(data.electorate.total);
+
+      renderCandidates(data.candidates);
+
+      if (Number(data.sections.counted || 0) === 0) {
+        els.status.textContent = 'Aguardando o início da totalização oficial do TSE.';
+      } else if (Number(data.sections.pct || 0) >= 100) {
+        els.status.textContent = 'Totalização concluída: 100,00% das seções.';
+      } else {
+        els.status.textContent = 'Apuração em andamento — dados oficiais do TSE.';
+      }
+
+      if (data.stale && data.warning) {
+        els.status.textContent += ' ' + data.warning;
+      }
+
+      const when = [data.generated_date, data.generated_time].filter(Boolean).join(' às ');
+      els.updated.textContent = when
+        ? 'Última geração do arquivo oficial: ' + when + ' • atualização automática a cada 10 segundos'
+        : 'Atualização automática a cada 10 segundos';
+    } catch (error) {
+      els.status.textContent = 'Não foi possível atualizar os dados do TSE agora. Nova tentativa automática em alguns segundos.';
+    }
+  }
+
+  loadResults();
+  window.setInterval(loadResults, 10000);
+})();
+</script>
+{% endblock %}
