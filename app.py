@@ -110,7 +110,7 @@ def register_vote(candidate, success_message='Voto simulado registrado com suces
     else:
         fp = voter_fingerprint()
         if Vote.query.filter_by(poll_id=poll.id, voter_hash=fp).first():
-            flash('Este navegador já registrou um voto nesta pesquisa.', 'warning')
+            flash('Só é permitida uma simulação por pessoa neste navegador. Reis Tech Software • Desenvolvedor: Franciel Reis', 'duplicate-warning')
             return redirect(url_for('results'))
 
     db.session.add(Vote(poll_id=poll.id, candidate_id=candidate.id, voter_hash=fp))
