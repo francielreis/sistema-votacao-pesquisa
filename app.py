@@ -513,6 +513,27 @@ def results():
     )
 
 
+def _attach_candidate_photos(data):
+    """Anexa fotos cadastradas no simulador aos candidatos oficiais pelo número."""
+    try:
+        photo_map = {
+            str(candidate.number): candidate.photo_url
+            for candidate in Candidate.query.filter(Candidate.photo_url.isnot(None)).all()
+            if candidate.number and candidate.photo_url
+        }
+    except Exception:
+        photo_map = {}
+
+    def apply(candidates):
+        for candidate in candidates or []:
+            candidate['photo_url'] = photo_map.get(str(candidate.get('number') or '')) or ''
+
+    apply(data.get('candidates'))
+    for region in data.get('regions', []) or []:
+        apply(region.get('candidates'))
+    return data
+
+
 @app.get('/apuracao-real')
 def official_results():
     return render_template(
@@ -525,7 +546,7 @@ def official_results():
 @app.get('/api/apuracao-real')
 def official_results_api():
     try:
-        data = fetch_tse_results()
+        data = _attach_candidate_photos(fetch_tse_results())
         return jsonify(data)
     except (HTTPError, URLError, TimeoutError, json.JSONDecodeError):
         return jsonify({
@@ -538,7 +559,7 @@ def official_results_api():
 @app.get('/api/apuracao-regioes')
 def official_regions_api():
     try:
-        return jsonify(fetch_region_results())
+        return jsonify(_attach_candidate_photos(fetch_region_results()))
     except Exception:
         return jsonify({
             'ok': False,
