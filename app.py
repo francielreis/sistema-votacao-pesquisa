@@ -103,6 +103,16 @@ def _normalize_tse_results(payload):
     sections = payload.get('s') or {}
     voters = payload.get('e') or {}
     votes = payload.get('v') or {}
+
+    section_total = _safe_int(sections.get('ts'))
+    section_counted = _safe_int(sections.get('st'))
+    section_pct = _safe_pct(sections.get('pst'))
+
+    # O TSE pode devolver o percentual com arredondamento. Quando todas as
+    # seções estiverem efetivamente totalizadas, força a exibição exata em 100%.
+    if section_total > 0 and section_counted >= section_total:
+        section_pct = 100.0
+
     valid_votes = sum(candidate['votes'] for candidate in candidates)
     blank_votes = _safe_int(votes.get('vb'))
     null_votes = _safe_int(votes.get('tvn') or votes.get('vn'))
@@ -117,9 +127,9 @@ def _normalize_tse_results(payload):
         'generated_date': payload.get('dg') or payload.get('dt') or '',
         'generated_time': payload.get('hg') or payload.get('ht') or '',
         'sections': {
-            'total': _safe_int(sections.get('ts')),
-            'counted': _safe_int(sections.get('st')),
-            'pct': _safe_pct(sections.get('pst')),
+            'total': section_total,
+            'counted': section_counted,
+            'pct': section_pct,
         },
         'electorate': {
             'total': _safe_int(voters.get('te')),
