@@ -357,6 +357,152 @@
     transition: width .7s ease;
   }
   .chart-title { margin: 6px 0 14px; font-size: 1.05rem; font-weight: 900; }
+
+  .final-result-card {
+    display: none;
+    margin: 18px 0 24px;
+    padding: 20px;
+    border-radius: 24px;
+    background: #25282e;
+    color: #f8fafc;
+    border: 1px solid rgba(255,255,255,.08);
+    box-shadow: 0 18px 42px rgba(0,0,0,.24);
+  }
+  .final-result-card.show { display: block; }
+  .final-result-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 12px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(34,197,94,.15);
+    color: #86efac;
+    font-size: .75rem;
+    font-weight: 950;
+    letter-spacing: .05em;
+  }
+  .final-winner-box {
+    display: grid;
+    grid-template-columns: minmax(0,1fr) 82px;
+    gap: 16px;
+    align-items: center;
+    padding: 16px;
+    border-radius: 18px;
+    background: #2d3036;
+    border: 1px solid rgba(255,255,255,.06);
+  }
+  .final-winner-title {
+    margin: 0 0 5px;
+    font-size: 1.55rem;
+    line-height: 1.08;
+    font-weight: 950;
+  }
+  .final-winner-copy {
+    margin: 0;
+    color: #d7dbe2;
+    line-height: 1.42;
+    font-size: .92rem;
+  }
+  .final-winner-photo-wrap {
+    position: relative;
+    width: 74px;
+    height: 74px;
+    justify-self: end;
+  }
+  .final-winner-photo, .final-winner-fallback {
+    width: 74px;
+    height: 74px;
+    border-radius: 50%;
+    object-fit: contain;
+    background: #fff;
+    border: 3px solid #f8fafc;
+  }
+  .final-winner-fallback {
+    display: grid;
+    place-items: center;
+    color: #334155;
+    font-weight: 950;
+    font-size: 1.25rem;
+  }
+  .final-winner-check {
+    position: absolute;
+    right: -3px;
+    bottom: 0;
+    width: 25px;
+    height: 25px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: #e2e8f0;
+    color: #111827;
+    border: 2px solid #25282e;
+    font-weight: 950;
+  }
+  .final-progress-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 13px;
+    color: #e5e7eb;
+    font-size: .88rem;
+    font-weight: 800;
+  }
+  .final-progress-track {
+    flex: 1;
+    height: 9px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #565b64;
+  }
+  .final-progress-fill {
+    height: 100%;
+    border-radius: inherit;
+    background: #e5e7eb;
+    transition: width .6s ease;
+  }
+  .final-candidate-list { margin-top: 15px; }
+  .final-candidate-row {
+    display: grid;
+    grid-template-columns: 48px minmax(0,1fr) auto;
+    gap: 11px;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255,255,255,.12);
+  }
+  .final-candidate-row:last-child { border-bottom: 0; }
+  .final-candidate-photo, .final-candidate-fallback {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    object-fit: contain;
+    background: #fff;
+    border: 2px solid rgba(255,255,255,.82);
+  }
+  .final-candidate-fallback {
+    display: grid;
+    place-items: center;
+    color: #334155;
+    font-size: .8rem;
+    font-weight: 950;
+  }
+  .final-candidate-name { font-weight: 950; line-height: 1.1; }
+  .final-candidate-meta { margin-top: 4px; color: #cbd5e1; font-size: .78rem; }
+  .final-candidate-score { text-align: right; white-space: nowrap; }
+  .final-candidate-pct { font-size: 1.2rem; font-weight: 950; }
+  .final-candidate-votes { margin-top: 4px; color: #cbd5e1; font-size: .78rem; }
+  .final-invalid-icon {
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: #353941;
+    border: 1px solid #667085;
+    color: #cbd5e1;
+    font-size: 1.15rem;
+    font-weight: 950;
+  }
   .updated { text-align: center; margin-top: 18px; opacity: .7; font-size: .9rem; }
   .official-disclaimer { margin-top: 20px; padding: 14px; border-left: 4px solid #1976d2; background: rgba(25,118,210,.08); border-radius: 10px; }
   .region-section { margin-top: 30px; padding-top: 22px; border-top: 1px solid rgba(127,127,127,.25); }
@@ -443,6 +589,19 @@
     .mobile-live-item strong { display: block; font-size: .78rem; margin-bottom: 2px; opacity: 1; }
 
     .status-box { margin: 10px 0 12px; padding: 10px 11px; border-radius: 12px; font-size: .83rem; line-height: 1.3; }
+    .final-result-card { margin: 12px 0 16px; padding: 13px; border-radius: 18px; }
+    .final-result-label { font-size: .65rem; margin-bottom: 9px; padding: 5px 8px; }
+    .final-winner-box { grid-template-columns: minmax(0,1fr) 64px; gap: 10px; padding: 12px; border-radius: 15px; }
+    .final-winner-title { font-size: 1.22rem; }
+    .final-winner-copy { font-size: .78rem; line-height: 1.35; }
+    .final-winner-photo-wrap, .final-winner-photo, .final-winner-fallback { width: 60px; height: 60px; }
+    .final-winner-check { width: 22px; height: 22px; font-size: .8rem; }
+    .final-progress-row { font-size: .72rem; gap: 7px; margin-top: 10px; }
+    .final-candidate-row { grid-template-columns: 42px minmax(0,1fr) auto; gap: 8px; padding: 10px 0; }
+    .final-candidate-photo, .final-candidate-fallback, .final-invalid-icon { width: 38px; height: 38px; }
+    .final-candidate-name { font-size: .92rem; }
+    .final-candidate-meta, .final-candidate-votes { font-size: .68rem; }
+    .final-candidate-pct { font-size: 1.05rem; }
     .summary-grid { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; margin: 11px 0 16px; }
     .metric { border-radius: 13px; padding: 11px 12px; }
     .metric-label { font-size: .72rem; margin-bottom: 5px; }
@@ -550,6 +709,22 @@
   </div>
 
   <div id="status" class="status-box">{% if official_data %}Apuração em andamento — dados oficiais do TSE.{% else %}Consultando os dados oficiais do TSE…{% endif %}</div>
+
+  <section id="finalResultCard" class="final-result-card" aria-live="polite" aria-label="Resultado final da eleição">
+    <div class="final-result-label">✓ RESULTADO CONFIRMADO PELO TSE</div>
+    <div class="final-winner-box">
+      <div>
+        <h2 id="finalWinnerTitle" class="final-winner-title">Resultado final</h2>
+        <p id="finalWinnerCopy" class="final-winner-copy">Resultado informado pelos dados oficiais do Tribunal Superior Eleitoral (TSE).</p>
+      </div>
+      <div id="finalWinnerPhotoWrap" class="final-winner-photo-wrap"></div>
+    </div>
+    <div class="final-progress-row">
+      <span><strong id="finalSectionsPct">0,00%</strong> das urnas apuradas</span>
+      <div class="final-progress-track"><div id="finalProgressFill" class="final-progress-fill" style="width:0%"></div></div>
+    </div>
+    <div id="finalCandidateRows" class="final-candidate-list"></div>
+  </section>
 
   <div class="summary-grid">
     <div class="metric">
@@ -705,6 +880,13 @@
 
   const els = {
     status: document.getElementById('status'),
+    finalResultCard: document.getElementById('finalResultCard'),
+    finalWinnerTitle: document.getElementById('finalWinnerTitle'),
+    finalWinnerCopy: document.getElementById('finalWinnerCopy'),
+    finalWinnerPhotoWrap: document.getElementById('finalWinnerPhotoWrap'),
+    finalSectionsPct: document.getElementById('finalSectionsPct'),
+    finalProgressFill: document.getElementById('finalProgressFill'),
+    finalCandidateRows: document.getElementById('finalCandidateRows'),
     sectionsPct: document.getElementById('sectionsPct'),
     sectionsCount: document.getElementById('sectionsCount'),
     votesTotal: document.getElementById('votesTotal'),
@@ -807,6 +989,145 @@
       card.appendChild(top);
       card.appendChild(track);
       els.candidates.appendChild(card);
+    });
+  }
+
+  function officialWinner(data) {
+    if (!data || !Array.isArray(data.candidates) || !data.candidates.length) return null;
+
+    const elected = data.candidates.find(function(candidate) {
+      return candidate && candidate.elected;
+    });
+    if (elected) return elected;
+
+    if (Number(data.sections?.pct || 0) >= 99.99) {
+      return data.candidates.slice().sort(function(a, b) {
+        return Number(b.votes || 0) - Number(a.votes || 0);
+      })[0] || null;
+    }
+    return null;
+  }
+
+  function candidateInitials(candidate) {
+    return String(candidate?.name || '?').trim().split(/\s+/).slice(0,2).map(function(part) {
+      return part ? part.charAt(0) : '';
+    }).join('').toUpperCase();
+  }
+
+  function buildFinalPhoto(candidate, winner) {
+    const wrap = document.createElement('div');
+    if (candidate && candidate.photo_url) {
+      const img = document.createElement('img');
+      img.className = winner ? 'final-winner-photo' : 'final-candidate-photo';
+      img.src = candidate.photo_url;
+      img.alt = 'Foto de ' + (candidate.name || 'candidato');
+      img.onerror = function() {
+        const fallback = document.createElement('div');
+        fallback.className = winner ? 'final-winner-fallback' : 'final-candidate-fallback';
+        fallback.textContent = candidateInitials(candidate);
+        if (img.parentNode) img.parentNode.replaceChild(fallback, img);
+      };
+      wrap.appendChild(img);
+    } else {
+      const fallback = document.createElement('div');
+      fallback.className = winner ? 'final-winner-fallback' : 'final-candidate-fallback';
+      fallback.textContent = candidateInitials(candidate);
+      wrap.appendChild(fallback);
+    }
+    if (winner) {
+      const check = document.createElement('span');
+      check.className = 'final-winner-check';
+      check.textContent = '✓';
+      wrap.appendChild(check);
+    }
+    return wrap;
+  }
+
+  function renderFinalResult(data) {
+    if (!els.finalResultCard) return;
+
+    const winner = officialWinner(data);
+    if (!winner) {
+      els.finalResultCard.classList.remove('show');
+      return;
+    }
+
+    els.finalResultCard.classList.add('show');
+    els.finalWinnerTitle.textContent = 'Vitória de ' + (winner.name || 'candidato eleito');
+    els.finalWinnerCopy.textContent =
+      'O resultado da disputa foi informado pelos dados oficiais do Tribunal Superior Eleitoral (TSE).';
+
+    els.finalWinnerPhotoWrap.innerHTML = '';
+    const winnerPhoto = buildFinalPhoto(winner, true);
+    while (winnerPhoto.firstChild) els.finalWinnerPhotoWrap.appendChild(winnerPhoto.firstChild);
+
+    const sectionsPct = Math.max(0, Math.min(100, Number(data.sections?.pct || 0)));
+    els.finalSectionsPct.textContent = fmtPct(sectionsPct);
+    els.finalProgressFill.style.width = sectionsPct + '%';
+
+    els.finalCandidateRows.innerHTML = '';
+    (data.candidates || []).forEach(function(candidate) {
+      const row = document.createElement('div');
+      row.className = 'final-candidate-row';
+
+      const photo = buildFinalPhoto(candidate, false);
+      const info = document.createElement('div');
+      const name = document.createElement('div');
+      name.className = 'final-candidate-name';
+      name.textContent = candidate.name || 'Candidato';
+      const meta = document.createElement('div');
+      meta.className = 'final-candidate-meta';
+      meta.textContent = [candidate.party, candidate.number ? 'nº ' + candidate.number : ''].filter(Boolean).join(' • ');
+      info.appendChild(name);
+      info.appendChild(meta);
+
+      const score = document.createElement('div');
+      score.className = 'final-candidate-score';
+      const pct = document.createElement('div');
+      pct.className = 'final-candidate-pct';
+      pct.textContent = fmtPct(candidate.pct);
+      const votes = document.createElement('div');
+      votes.className = 'final-candidate-votes';
+      votes.textContent = fmtInt(candidate.votes || 0) + ' votos';
+      score.appendChild(pct);
+      score.appendChild(votes);
+
+      row.appendChild(photo);
+      row.appendChild(info);
+      row.appendChild(score);
+      els.finalCandidateRows.appendChild(row);
+    });
+
+    [
+      { label: 'Nulo (inválido)', votes: data.votes?.null || 0, icon: '×' },
+      { label: 'Branco', votes: data.votes?.blank || 0, icon: '○' }
+    ].forEach(function(item) {
+      if (!Number(item.votes || 0)) return;
+      const row = document.createElement('div');
+      row.className = 'final-candidate-row';
+
+      const icon = document.createElement('div');
+      icon.className = 'final-invalid-icon';
+      icon.textContent = item.icon;
+
+      const info = document.createElement('div');
+      const name = document.createElement('div');
+      name.className = 'final-candidate-name';
+      name.textContent = item.label;
+      info.appendChild(name);
+
+      const score = document.createElement('div');
+      score.className = 'final-candidate-score';
+      const votes = document.createElement('div');
+      votes.className = 'final-candidate-votes';
+      votes.style.fontSize = '.88rem';
+      votes.textContent = fmtInt(item.votes) + ' votos';
+      score.appendChild(votes);
+
+      row.appendChild(icon);
+      row.appendChild(info);
+      row.appendChild(score);
+      els.finalCandidateRows.appendChild(row);
     });
   }
 
@@ -1312,6 +1633,7 @@
 
   if (latestOfficialData) {
     updateRobotBubble(latestOfficialData);
+    renderFinalResult(latestOfficialData);
   }
 
   function clearRobotAutoRetries() {
@@ -1397,6 +1719,7 @@
 
       latestOfficialData = data;
       renderCandidates(data.candidates);
+      renderFinalResult(data);
       updateRobotBubble(data);
 
       if (robotVoiceEnabled) {
@@ -1417,7 +1740,10 @@
         }
       }
 
-      if (Number(data.sections.counted || 0) === 0) {
+      const winner = officialWinner(data);
+      if (winner) {
+        els.status.textContent = 'Resultado confirmado pelo TSE — vitória de ' + (winner.name || 'candidato eleito') + '.';
+      } else if (Number(data.sections.counted || 0) === 0) {
         els.status.textContent = 'Aguardando o início da totalização oficial do TSE.';
       } else if (Number(data.sections.pct || 0) >= 100) {
         els.status.textContent = 'Totalização concluída: 100,00% das seções.';
